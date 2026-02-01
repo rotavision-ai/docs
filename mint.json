@@ -184,5 +184,10 @@
     "auth": {
       "method": "bearer"
     }
+  },
+  "analytics": {
+    "ga4": {
+      "measurementId": "G-2H7M0EWZG0"
+    }
   }
 }
