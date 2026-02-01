@@ -2,11 +2,11 @@
   "$schema": "https://mintlify.com/schema.json",
   "name": "Rotavision Documentation",
   "logo": {
-    "dark": "/images/logo-dark.svg",
-    "light": "/images/logo-light.svg",
+    "dark": "/images/logo-dark.png",
+    "light": "/images/logo-light.png",
     "href": "https://rotavision.com"
   },
-  "favicon": "/images/favicon.svg",
+  "favicon": "/images/favicon.png",
   "colors": {
     "primary": "#010ED0",
     "light": "#6B8BFF",

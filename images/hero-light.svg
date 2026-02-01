@@ -1,16 +1,16 @@
 <svg width="800" height="400" viewBox="0 0 800 400" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="800" height="400" fill="#FAFAFA"/>
   <rect x="50" y="50" width="200" height="120" rx="8" fill="white" stroke="#E5E5E5"/>
-  <text x="150" y="115" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#737373">Vishwas</text>
+  <text x="150" y="115" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#737373">Vishwas</text>
   <rect x="300" y="50" width="200" height="120" rx="8" fill="white" stroke="#E5E5E5"/>
-  <text x="400" y="115" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#737373">Guardian</text>
+  <text x="400" y="115" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#737373">Guardian</text>
   <rect x="550" y="50" width="200" height="120" rx="8" fill="white" stroke="#E5E5E5"/>
-  <text x="650" y="115" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#737373">Dastavez</text>
+  <text x="650" y="115" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#737373">Dastavez</text>
   <rect x="50" y="230" width="200" height="120" rx="8" fill="white" stroke="#E5E5E5"/>
-  <text x="150" y="295" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#737373">Sankalp</text>
+  <text x="150" y="295" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#737373">Sankalp</text>
   <rect x="300" y="230" width="200" height="120" rx="8" fill="white" stroke="#E5E5E5"/>
-  <text x="400" y="295" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#737373">Orchestrate</text>
+  <text x="400" y="295" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#737373">Orchestrate</text>
   <rect x="550" y="230" width="200" height="120" rx="8" fill="white" stroke="#E5E5E5"/>
-  <text x="650" y="295" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#737373">Gati</text>
-  <text x="400" y="200" text-anchor="middle" font-family="DM Serif Display" font-size="24" fill="#010ED0">Rotavision Platform</text>
+  <text x="650" y="295" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#737373">Gati</text>
+  <text x="400" y="200" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="24" font-weight="400" fill="#010ED0">Rotavision Platform</text>
 </svg>
