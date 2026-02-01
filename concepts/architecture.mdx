@@ -7,37 +7,50 @@ description: "Understanding the Rotavision platform architecture"
 
 Rotavision is built as a modular, cloud-native platform that integrates seamlessly with your existing ML infrastructure.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Your Application                           │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Rotavision SDK Layer                         │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  Python  │  │ Node.js  │  │   Java   │  │   REST   │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Rotavision API Gateway                       │
-│         Authentication │ Rate Limiting │ Request Routing        │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│    Vishwas    │    │   Guardian    │    │   Dastavez    │
-│   Fairness    │    │  Monitoring   │    │  Document AI  │
-└───────────────┘    └───────────────┘    └───────────────┘
-        │                     │                     │
-        ▼                     ▼                     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Shared Infrastructure                        │
-│     Storage │ Compute │ ML Runtime │ Analytics │ Webhooks       │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Application["Your Application"]
+        APP[Web/Mobile/Backend]
+    end
+
+    subgraph SDK["Rotavision SDK Layer"]
+        PY[Python]
+        NODE[Node.js]
+        JAVA[Java]
+        REST[REST API]
+    end
+
+    subgraph Gateway["API Gateway"]
+        AUTH[Authentication]
+        RATE[Rate Limiting]
+        ROUTE[Request Routing]
+    end
+
+    subgraph Products["Product Services"]
+        VISHWAS[Vishwas<br/>Trust & Fairness]
+        GUARDIAN[Guardian<br/>Monitoring]
+        DASTAVEZ[Dastavez<br/>Document AI]
+        SANKALP[Sankalp<br/>LLM Gateway]
+        ORCHESTRATE[Orchestrate<br/>Multi-Agent]
+        GATI[Gati<br/>Fleet Intel]
+    end
+
+    subgraph Infra["Shared Infrastructure"]
+        STORAGE[(Storage)]
+        COMPUTE[Compute]
+        ML[ML Runtime]
+        ANALYTICS[Analytics]
+        WEBHOOKS[Webhooks]
+    end
+
+    APP --> SDK
+    PY & NODE & JAVA & REST --> Gateway
+    AUTH & RATE & ROUTE --> Products
+    VISHWAS & GUARDIAN & DASTAVEZ & SANKALP & ORCHESTRATE & GATI --> Infra
+
+    style Application fill:#f5f5f5,stroke:#333
+    style Gateway fill:#010ED0,stroke:#333,color:#fff
+    style Products fill:#6B8BFF,stroke:#333,color:#fff
 ```
 
 ## Deployment Options
@@ -65,18 +78,40 @@ Rotavision is built as a modular, cloud-native platform that integrates seamless
 
 For real-time operations (explanations, proxy requests):
 
-```
-Client → API Gateway → Product Service → Response
-         (< 100ms)      (< 500ms)
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant G as API Gateway
+    participant S as Product Service
+
+    C->>G: Request
+    Note over C,G: < 100ms
+    G->>S: Route Request
+    Note over G,S: < 500ms
+    S-->>G: Response
+    G-->>C: Response
 ```
 
 ### Asynchronous Jobs
 
 For batch operations (fairness analysis, document extraction):
 
-```
-Client → API Gateway → Job Queue → Worker → Webhook/Polling
-         (< 100ms)                          (seconds-minutes)
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant G as API Gateway
+    participant Q as Job Queue
+    participant W as Worker
+    participant WH as Webhook
+
+    C->>G: Submit Job
+    Note over C,G: < 100ms
+    G->>Q: Queue Job
+    G-->>C: job_id
+    Q->>W: Process
+    Note over Q,W: seconds-minutes
+    W->>WH: Notify Complete
+    WH-->>C: Webhook Callback
 ```
 
 <Info>
@@ -100,22 +135,53 @@ All data processed by Rotavision Cloud is stored in India by default:
 
 ## Security Architecture
 
+```mermaid
+flowchart LR
+    subgraph Security["Security Layers"]
+        direction TB
+        T["🔒 Transport<br/>TLS 1.3, Certificate Pinning"]
+        AN["🔑 Authentication<br/>API Keys, OAuth 2.0, SAML"]
+        AZ["👤 Authorization<br/>Scoped Keys, RBAC, Policies"]
+        D["💾 Data Protection<br/>AES-256 at rest, Field encryption"]
+        N["🌐 Network<br/>VPC isolation, Private endpoints"]
+        A["📋 Audit<br/>Immutable logs, SIEM integration"]
+    end
+
+    T --> AN --> AZ --> D --> N --> A
+
+    style Security fill:#f8f9fa,stroke:#333
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Security Layers                            │
-├─────────────────────────────────────────────────────────────────┤
-│  Transport    │  TLS 1.3, Certificate Pinning                   │
-├───────────────┼─────────────────────────────────────────────────┤
-│  AuthN        │  API Keys, OAuth 2.0, SAML (Enterprise)         │
-├───────────────┼─────────────────────────────────────────────────┤
-│  AuthZ        │  Scoped Keys, RBAC, Resource Policies           │
-├───────────────┼─────────────────────────────────────────────────┤
-│  Data         │  AES-256 at rest, Field-level encryption        │
-├───────────────┼─────────────────────────────────────────────────┤
-│  Network      │  VPC isolation, Private endpoints               │
-├───────────────┼─────────────────────────────────────────────────┤
-│  Audit        │  Immutable logs, SIEM integration               │
-└───────────────┴─────────────────────────────────────────────────┘
+
+```mermaid
+flowchart TB
+    subgraph Perimeter["Network Perimeter"]
+        WAF[Web Application Firewall]
+        DDoS[DDoS Protection]
+    end
+
+    subgraph Auth["Authentication Layer"]
+        API[API Key Validation]
+        OAuth[OAuth 2.0]
+        SAML[SAML SSO]
+    end
+
+    subgraph Core["Core Services"]
+        ENC[Encryption Service]
+        VAULT[Secrets Vault]
+        AUDIT[Audit Logger]
+    end
+
+    subgraph Data["Data Layer"]
+        DB[(Encrypted Storage)]
+        LOGS[(Immutable Logs)]
+    end
+
+    Perimeter --> Auth --> Core --> Data
+
+    style Perimeter fill:#fee2e2,stroke:#991b1b
+    style Auth fill:#fef3c7,stroke:#92400e
+    style Core fill:#dbeafe,stroke:#1e40af
+    style Data fill:#dcfce7,stroke:#166534
 ```
 
 ## Integration Patterns
@@ -153,8 +219,60 @@ containers:
 
 Process events asynchronously via message queues:
 
+```mermaid
+flowchart LR
+    MS[Model Service] --> MQ[Kafka / SQS]
+    MQ --> RC[Rotavision Consumer]
+    RC --> ST[(Storage)]
+    RC --> WH[Webhook Notifications]
+
+    style MS fill:#f5f5f5,stroke:#333
+    style MQ fill:#ff6b6b,stroke:#333,color:#fff
+    style RC fill:#010ED0,stroke:#333,color:#fff
+    style ST fill:#22c55e,stroke:#333,color:#fff
 ```
-Model Service → Kafka/SQS → Rotavision Consumer → Storage
+
+## Product Integration Flow
+
+```mermaid
+flowchart TB
+    subgraph Input["Input Sources"]
+        API_REQ[API Request]
+        WEBHOOK_IN[Webhook Event]
+        BATCH[Batch Upload]
+    end
+
+    subgraph Processing["Rotavision Processing"]
+        direction TB
+
+        subgraph Trust["Trust Layer"]
+            V_ANALYZE[Vishwas Analyze]
+            V_EXPLAIN[Vishwas Explain]
+        end
+
+        subgraph Monitor["Monitoring Layer"]
+            G_DETECT[Guardian Detect]
+            G_ALERT[Guardian Alert]
+        end
+
+        subgraph Intelligence["Intelligence Layer"]
+            D_EXTRACT[Dastavez Extract]
+            S_PROXY[Sankalp Proxy]
+            O_RUN[Orchestrate Run]
+        end
+    end
+
+    subgraph Output["Output Channels"]
+        RESPONSE[API Response]
+        WEBHOOK_OUT[Webhook Callback]
+        DASHBOARD[Dashboard]
+    end
+
+    Input --> Processing --> Output
+
+    style Trust fill:#dcfce7,stroke:#166534
+    style Monitor fill:#fef3c7,stroke:#92400e
+    style Intelligence fill:#dbeafe,stroke:#1e40af
 ```
 
 ## High Availability
@@ -166,4 +284,35 @@ Rotavision Cloud is designed for 99.9% availability:
 - **Circuit breakers** prevent cascade failures
 - **Graceful degradation** maintains core functionality during partial outages
 
-See our [Status Page](https://status.rotavision.com) for real-time availability.
+```mermaid
+flowchart TB
+    subgraph Region["Mumbai Region (ap-south-1)"]
+        subgraph AZ1["Availability Zone 1"]
+            LB1[Load Balancer]
+            APP1[App Servers]
+            DB1[(Primary DB)]
+        end
+
+        subgraph AZ2["Availability Zone 2"]
+            LB2[Load Balancer]
+            APP2[App Servers]
+            DB2[(Replica DB)]
+        end
+
+        subgraph AZ3["Availability Zone 3"]
+            LB3[Load Balancer]
+            APP3[App Servers]
+            DB3[(Replica DB)]
+        end
+    end
+
+    GLB[Global Load Balancer] --> LB1 & LB2 & LB3
+    DB1 -.->|Replication| DB2 & DB3
+
+    style Region fill:#f5f5f5,stroke:#333
+    style AZ1 fill:#dcfce7,stroke:#166534
+    style AZ2 fill:#dbeafe,stroke:#1e40af
+    style AZ3 fill:#fef3c7,stroke:#92400e
+```
+
+See our [Status Page](/status) for real-time availability.
