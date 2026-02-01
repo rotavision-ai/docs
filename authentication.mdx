@@ -3,9 +3,22 @@ title: Authentication
 description: "Secure your API requests with Rotavision API keys"
 ---
 
-## API Keys
+## Get Your API Key
 
-All API requests to Rotavision require authentication using an API key. You can create and manage API keys from your [dashboard](https://dashboard.rotavision.com/settings/api-keys).
+<Card title="Get a Free API Key" icon="key" href="https://api.rotavision.com/docs">
+  Click "Get API Key" to instantly receive a test key. No signup required.
+</Card>
+
+All API requests to Rotavision require authentication using an API key.
+
+### Self-Service Registration
+
+1. Visit [api.rotavision.com/docs](https://api.rotavision.com/docs)
+2. Click **"Get API Key"** in the top navigation
+3. Enter your email, name, and company
+4. Receive your `rv_test_*` key instantly via email
+
+Test keys include 100 requests/day in the sandbox environment. For production access, [contact our team](https://rotavision.com/contact).
 
 ### Key Types
 
@@ -181,11 +194,11 @@ We recommend rotating API keys periodically. The dashboard supports:
 
 ## Rate Limits by Key Type
 
-| Key Type | Requests/min | Requests/day |
-|----------|--------------|--------------|
-| Test | 60 | 1,000 |
-| Live (Starter) | 600 | 50,000 |
-| Live (Growth) | 3,000 | 500,000 |
-| Live (Enterprise) | Custom | Custom |
+| Key Type | Requests/min | Requests/day | Access |
+|----------|--------------|--------------|--------|
+| Test (Self-Service) | 10 | 100 | [Get instantly](https://api.rotavision.com/docs) |
+| Live (Starter) | 600 | 50,000 | [Contact sales](https://rotavision.com/contact) |
+| Live (Growth) | 3,000 | 500,000 | [Contact sales](https://rotavision.com/contact) |
+| Live (Enterprise) | Custom | Custom | [Contact sales](https://rotavision.com/contact) |
 
 See [Rate Limits](/concepts/rate-limits) for detailed information.
