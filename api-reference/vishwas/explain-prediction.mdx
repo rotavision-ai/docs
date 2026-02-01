@@ -1,0 +1,239 @@
+---
+title: Explain Prediction
+api: POST /vishwas/explain
+description: "Generate human-readable explanations for model predictions"
+---
+
+## Request
+
+<ParamField body="model_id" type="string" required>
+  Unique identifier for your model.
+</ParamField>
+
+<ParamField body="input_data" type="object" required>
+  The input features for the prediction to explain.
+</ParamField>
+
+<ParamField body="prediction" type="number | string" required>
+  The model's prediction (probability or class label).
+</ParamField>
+
+<ParamField body="method" type="string" default="shap">
+  Explanation method to use:
+  - `shap` - SHAP values (recommended)
+  - `lime` - LIME explanations
+  - `anchors` - Rule-based anchors
+  - `counterfactual` - Counterfactual examples
+  - `prototype` - Similar training examples
+</ParamField>
+
+<ParamField body="num_features" type="integer" default="10">
+  Number of top features to include in explanation.
+</ParamField>
+
+<ParamField body="language" type="string" default="en">
+  Language for human-readable text. Supports: `en`, `hi`, `ta`, `te`, `bn`, `mr`, `gu`, `kn`, `ml`, `pa`, `or`, `as`.
+</ParamField>
+
+<ParamField body="audience" type="string" default="technical">
+  Target audience for explanation:
+  - `technical` - For data scientists and ML engineers
+  - `business` - For business stakeholders
+  - `customer` - For end users/customers
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique explanation identifier.
+</ResponseField>
+
+<ResponseField name="model_id" type="string">
+  The model ID.
+</ResponseField>
+
+<ResponseField name="method" type="string">
+  The explanation method used.
+</ResponseField>
+
+<ResponseField name="prediction" type="object">
+  The prediction being explained.
+</ResponseField>
+
+<ResponseField name="features" type="array">
+  Feature contributions ranked by importance.
+</ResponseField>
+
+<ResponseField name="summary" type="string">
+  Human-readable explanation text.
+</ResponseField>
+
+<ResponseField name="counterfactuals" type="array">
+  Counterfactual examples (if method is `counterfactual`).
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/vishwas/explain \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_id": "loan-approval-v2",
+    "input_data": {
+      "age": 32,
+      "income": 850000,
+      "credit_score": 720,
+      "employment_years": 5,
+      "existing_loans": 1,
+      "region": "urban"
+    },
+    "prediction": 0.73,
+    "method": "shap",
+    "num_features": 5,
+    "language": "en",
+    "audience": "customer"
+  }'
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+explanation = client.vishwas.explain(
+    model_id="loan-approval-v2",
+    input_data={
+        "age": 32,
+        "income": 850000,
+        "credit_score": 720,
+        "employment_years": 5,
+        "existing_loans": 1,
+        "region": "urban"
+    },
+    prediction=0.73,
+    method="shap",
+    num_features=5,
+    language="en",
+    audience="customer"
+)
+
+print(explanation.summary)
+for feature in explanation.features:
+    print(f"  {feature.name}: {feature.contribution:+.2f}")
+```
+
+```typescript Node.js
+import { Rotavision } from '@rotavision/sdk';
+
+const client = new Rotavision();
+
+const explanation = await client.vishwas.explain({
+  modelId: 'loan-approval-v2',
+  inputData: {
+    age: 32,
+    income: 850000,
+    credit_score: 720,
+    employment_years: 5,
+    existing_loans: 1,
+    region: 'urban'
+  },
+  prediction: 0.73,
+  method: 'shap',
+  numFeatures: 5,
+  language: 'en',
+  audience: 'customer'
+});
+
+console.log(explanation.summary);
+explanation.features.forEach(f => {
+  console.log(`  ${f.name}: ${f.contribution > 0 ? '+' : ''}${f.contribution.toFixed(2)}`);
+});
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "id": "explain_xyz789",
+  "model_id": "loan-approval-v2",
+  "method": "shap",
+  "prediction": {
+    "value": 0.73,
+    "label": "likely_approved",
+    "confidence": "medium-high"
+  },
+  "features": [
+    {
+      "name": "credit_score",
+      "value": 720,
+      "contribution": 0.18,
+      "direction": "positive",
+      "description": "Your credit score of 720 is above average, increasing approval likelihood"
+    },
+    {
+      "name": "income",
+      "value": 850000,
+      "contribution": 0.15,
+      "direction": "positive",
+      "description": "Your annual income supports the requested loan amount"
+    },
+    {
+      "name": "employment_years",
+      "value": 5,
+      "contribution": 0.08,
+      "direction": "positive",
+      "description": "5 years of stable employment is viewed favorably"
+    },
+    {
+      "name": "existing_loans",
+      "value": 1,
+      "contribution": -0.05,
+      "direction": "negative",
+      "description": "Having an existing loan slightly reduces approval likelihood"
+    },
+    {
+      "name": "age",
+      "value": 32,
+      "contribution": 0.02,
+      "direction": "positive",
+      "description": "Your age falls within a favorable range for this loan type"
+    }
+  ],
+  "summary": "Your loan application has a 73% likelihood of approval. The main factors supporting your application are your good credit score (720) and stable income (₹8.5 lakhs annually). Your 5 years of employment history also strengthens your application. The only factor slightly reducing your score is your existing loan, but this is minor compared to the positive factors.",
+  "baseline": 0.35,
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+
+```json 200 - Counterfactual
+{
+  "id": "explain_xyz789",
+  "model_id": "loan-approval-v2",
+  "method": "counterfactual",
+  "prediction": {
+    "value": 0.42,
+    "label": "likely_rejected"
+  },
+  "counterfactuals": [
+    {
+      "changes": {
+        "credit_score": {"from": 620, "to": 680}
+      },
+      "new_prediction": 0.68,
+      "feasibility": "medium",
+      "description": "Improving your credit score by 60 points would significantly increase approval chances"
+    },
+    {
+      "changes": {
+        "existing_loans": {"from": 3, "to": 1}
+      },
+      "new_prediction": 0.61,
+      "feasibility": "high",
+      "description": "Paying off 2 existing loans would improve your debt-to-income ratio"
+    }
+  ],
+  "summary": "Your application currently has a 42% approval likelihood. The most actionable improvement would be to reduce your existing loans from 3 to 1, which could increase approval chances to 61%.",
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+</ResponseExample>

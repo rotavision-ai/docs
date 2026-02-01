@@ -1,0 +1,16 @@
+<svg width="800" height="400" viewBox="0 0 800 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="400" fill="#0A0A0A"/>
+  <rect x="50" y="50" width="200" height="120" rx="8" fill="#1a1a1a" stroke="#333"/>
+  <text x="150" y="115" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#9CA3AF">Vishwas</text>
+  <rect x="300" y="50" width="200" height="120" rx="8" fill="#1a1a1a" stroke="#333"/>
+  <text x="400" y="115" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#9CA3AF">Guardian</text>
+  <rect x="550" y="50" width="200" height="120" rx="8" fill="#1a1a1a" stroke="#333"/>
+  <text x="650" y="115" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#9CA3AF">Dastavez</text>
+  <rect x="50" y="230" width="200" height="120" rx="8" fill="#1a1a1a" stroke="#333"/>
+  <text x="150" y="295" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#9CA3AF">Sankalp</text>
+  <rect x="300" y="230" width="200" height="120" rx="8" fill="#1a1a1a" stroke="#333"/>
+  <text x="400" y="295" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#9CA3AF">Orchestrate</text>
+  <rect x="550" y="230" width="200" height="120" rx="8" fill="#1a1a1a" stroke="#333"/>
+  <text x="650" y="295" text-anchor="middle" font-family="DM Sans" font-size="14" fill="#9CA3AF">Gati</text>
+  <text x="400" y="200" text-anchor="middle" font-family="DM Serif Display" font-size="24" fill="#6B8BFF">Rotavision Platform</text>
+</svg>

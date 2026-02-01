@@ -1,0 +1,209 @@
+---
+title: Bias Detection Guide
+description: "Detect and mitigate bias in your AI models"
+---
+
+## Overview
+
+This guide walks through using Vishwas to detect and address bias in machine learning models, with a focus on Indian regulatory requirements and protected attributes.
+
+## Prerequisites
+
+- Rotavision account with Vishwas access
+- Model predictions and ground truth labels
+- Identified protected attributes (gender, region, etc.)
+
+## Step 1: Prepare Your Data
+
+```python
+import pandas as pd
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Load your dataset
+df = pd.read_csv("loan_applications.csv")
+
+# Prepare for analysis
+dataset = {
+    "features": df.columns.tolist(),
+    "data": df.values.tolist(),
+    "predictions": df["model_prediction"].tolist(),
+    "actuals": df["approved"].tolist(),
+    "protected_attributes": ["gender", "region", "age_group"]
+}
+```
+
+## Step 2: Run Fairness Analysis
+
+```python
+analysis = client.vishwas.analyze(
+    model_id="loan-approval-v2",
+    dataset=dataset,
+    metrics=[
+        "demographic_parity",
+        "equalized_odds",
+        "equal_opportunity",
+        "calibration"
+    ],
+    thresholds={
+        "demographic_parity": 0.80,  # 80% threshold
+        "equalized_odds": 0.80
+    }
+)
+
+print(f"Overall Fairness Score: {analysis.overall_score:.2f}")
+print(f"Bias Detected: {analysis.bias_detected}")
+```
+
+## Step 3: Interpret Results
+
+```python
+for metric in analysis.metrics:
+    status_icon = "✅" if metric.status == "pass" else "⚠️"
+    print(f"{status_icon} {metric.name}: {metric.value:.3f} (threshold: {metric.threshold})")
+
+    if metric.affected_groups:
+        print(f"   Affected groups: {', '.join(metric.affected_groups)}")
+```
+
+### Example Output
+
+```
+⚠️ demographic_parity: 0.72 (threshold: 0.80)
+   Affected groups: region:rural, gender:female
+✅ equalized_odds: 0.85 (threshold: 0.80)
+✅ equal_opportunity: 0.88 (threshold: 0.80)
+✅ calibration: 0.91 (threshold: 0.80)
+```
+
+## Step 4: Review Recommendations
+
+```python
+for rec in analysis.recommendations:
+    print(f"[{rec.severity.upper()}] {rec.message}")
+    print(f"  Action: {rec.action}")
+    print(f"  Expected impact: {rec.impact_estimate}")
+    print()
+```
+
+## Step 5: Generate Compliance Report
+
+```python
+report = client.vishwas.generate_report(
+    analysis_id=analysis.id,
+    template="rbi",  # RBI compliance format
+    format="pdf",
+    metadata={
+        "model_name": "Loan Approval Model v2",
+        "model_owner": "Credit Risk Team",
+        "review_date": "2026-02-01"
+    }
+)
+
+# Download report
+print(f"Report URL: {report.download_url}")
+```
+
+## Common Mitigation Strategies
+
+<AccordionGroup>
+  <Accordion title="Resampling" icon="scale-balanced">
+    Balance training data across protected groups:
+
+    ```python
+    from sklearn.utils import resample
+
+    # Oversample minority groups
+    df_majority = df[df.gender == 'male']
+    df_minority = df[df.gender == 'female']
+
+    df_minority_upsampled = resample(
+        df_minority,
+        replace=True,
+        n_samples=len(df_majority)
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Threshold Adjustment" icon="sliders">
+    Apply different decision thresholds per group:
+
+    ```python
+    # Post-processing threshold adjustment
+    thresholds = {
+        "urban": 0.50,
+        "rural": 0.45,  # Lower threshold for disadvantaged group
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Feature Engineering" icon="wrench">
+    Remove or transform proxy features:
+
+    ```python
+    # Remove features highly correlated with protected attributes
+    corr = df[['prediction', 'pincode', 'region']].corr()
+
+    # Consider removing 'pincode' if it's a proxy for region
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Indian Regulatory Context
+
+### RBI Guidelines
+
+The RBI requires fairness analysis for AI/ML models used in:
+- Credit scoring and lending decisions
+- Customer segmentation
+- Fraud detection
+
+Key requirements:
+- Document protected attributes considered
+- Quantify disparate impact
+- Implement ongoing monitoring
+
+### Protected Attributes in India
+
+Common protected attributes to analyze:
+- **Gender**: Male, Female, Other
+- **Region**: Urban, Semi-urban, Rural
+- **State**: Geographic bias across states
+- **Language**: Language preference as proxy
+- **Age**: Age-based discrimination
+
+<Warning>
+  Caste and religion are highly sensitive in India. Consult legal counsel before including in analysis, even for bias detection purposes.
+</Warning>
+
+## Continuous Monitoring
+
+Set up Guardian to monitor fairness drift in production:
+
+```python
+monitor = client.guardian.create_monitor(
+    model_id="loan-approval-v2",
+    name="Fairness Monitor",
+    metrics=["prediction_drift"],
+    alerts=[
+        {
+            "metric": "prediction_drift",
+            "threshold": 0.15,
+            "severity": "warning",
+            "group_by": "region"  # Monitor drift per region
+        }
+    ]
+)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Explainability" icon="lightbulb" href="/guides/model-monitoring">
+    Generate explanations for model decisions
+  </Card>
+  <Card title="Production Monitoring" icon="chart-line" href="/guides/model-monitoring">
+    Set up continuous fairness monitoring
+  </Card>
+</CardGroup>

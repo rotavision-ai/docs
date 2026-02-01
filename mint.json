@@ -1,0 +1,204 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Rotavision Documentation",
+  "logo": {
+    "dark": "/images/logo-dark.svg",
+    "light": "/images/logo-light.svg",
+    "href": "https://rotavision.com"
+  },
+  "favicon": "/images/favicon.svg",
+  "colors": {
+    "primary": "#010ED0",
+    "light": "#6B8BFF",
+    "dark": "#010ED0",
+    "background": {
+      "dark": "#0A0A0A",
+      "light": "#FFFFFF"
+    },
+    "anchors": {
+      "from": "#010ED0",
+      "to": "#6B8BFF"
+    }
+  },
+  "font": {
+    "headings": {
+      "family": "DM Serif Display",
+      "url": "https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap"
+    },
+    "body": {
+      "family": "DM Sans",
+      "url": "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:support@rotavision.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "https://rotavision.com/contact"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    },
+    {
+      "name": "SDKs",
+      "url": "sdks"
+    },
+    {
+      "name": "Integrations",
+      "url": "integrations"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/rotavision-ai"
+    },
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://discord.gg/rotavision"
+    },
+    {
+      "name": "Blog",
+      "icon": "newspaper",
+      "url": "https://rotavision.com/blog"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "authentication",
+        "errors"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "concepts/architecture",
+        "concepts/trust-scores",
+        "concepts/webhooks",
+        "concepts/rate-limits"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/bias-detection",
+        "guides/model-monitoring",
+        "guides/document-extraction",
+        "guides/multi-agent-workflows"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/overview"
+      ]
+    },
+    {
+      "group": "Vishwas",
+      "pages": [
+        "api-reference/vishwas/overview",
+        "api-reference/vishwas/analyze-fairness",
+        "api-reference/vishwas/explain-prediction",
+        "api-reference/vishwas/generate-report"
+      ]
+    },
+    {
+      "group": "Guardian",
+      "pages": [
+        "api-reference/guardian/overview",
+        "api-reference/guardian/create-monitor",
+        "api-reference/guardian/log-inference",
+        "api-reference/guardian/get-alerts"
+      ]
+    },
+    {
+      "group": "Dastavez",
+      "pages": [
+        "api-reference/dastavez/overview",
+        "api-reference/dastavez/extract-document",
+        "api-reference/dastavez/create-agent",
+        "api-reference/dastavez/run-workflow"
+      ]
+    },
+    {
+      "group": "Sankalp",
+      "pages": [
+        "api-reference/sankalp/overview",
+        "api-reference/sankalp/proxy-request",
+        "api-reference/sankalp/list-models",
+        "api-reference/sankalp/get-usage"
+      ]
+    },
+    {
+      "group": "Orchestrate",
+      "pages": [
+        "api-reference/orchestrate/overview",
+        "api-reference/orchestrate/create-workflow",
+        "api-reference/orchestrate/run-workflow",
+        "api-reference/orchestrate/get-execution"
+      ]
+    },
+    {
+      "group": "Gati",
+      "pages": [
+        "api-reference/gati/overview",
+        "api-reference/gati/optimize-routes",
+        "api-reference/gati/track-fleet",
+        "api-reference/gati/predict-demand"
+      ]
+    },
+    {
+      "group": "SDKs",
+      "pages": [
+        "sdks/overview",
+        "sdks/python",
+        "sdks/nodejs",
+        "sdks/java"
+      ]
+    },
+    {
+      "group": "Integrations",
+      "pages": [
+        "integrations/overview",
+        "integrations/aws",
+        "integrations/azure",
+        "integrations/gcp",
+        "integrations/langchain",
+        "integrations/llamaindex"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "twitter": "https://twitter.com/rotavision_ai",
+    "github": "https://github.com/rotavision-ai",
+    "linkedin": "https://linkedin.com/company/rotavision"
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true
+  },
+  "api": {
+    "baseUrl": "https://api.rotavision.com",
+    "auth": {
+      "method": "bearer"
+    },
+    "playground": {
+      "mode": "simple"
+    }
+  },
+  "openapi": [
+    "api-reference/openapi.yaml"
+  ]
+}

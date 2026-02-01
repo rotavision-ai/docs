@@ -1,0 +1,173 @@
+---
+title: Get Alerts
+api: GET /guardian/monitors/{monitor_id}/alerts
+description: "Retrieve alerts for a monitor"
+---
+
+## Request
+
+<ParamField path="monitor_id" type="string" required>
+  The monitor ID to get alerts for.
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by status: `active`, `acknowledged`, `resolved`, `all`.
+</ParamField>
+
+<ParamField query="severity" type="string">
+  Filter by severity: `info`, `warning`, `critical`.
+</ParamField>
+
+<ParamField query="metric" type="string">
+  Filter by metric name.
+</ParamField>
+
+<ParamField query="created_after" type="string">
+  Filter alerts created after this timestamp (ISO 8601).
+</ParamField>
+
+<ParamField query="created_before" type="string">
+  Filter alerts created before this timestamp (ISO 8601).
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Number of alerts to return (max 100).
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Pagination cursor.
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl "https://api.rotavision.com/v1/guardian/monitors/mon_abc123/alerts?status=active&severity=critical" \
+  -H "Authorization: Bearer rv_live_..."
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+alerts = client.guardian.get_alerts(
+    monitor_id="mon_abc123",
+    status="active",
+    severity="critical"
+)
+
+for alert in alerts.data:
+    print(f"[{alert.severity}] {alert.metric}: {alert.message}")
+```
+
+```typescript Node.js
+import { Rotavision } from '@rotavision/sdk';
+
+const client = new Rotavision();
+
+const alerts = await client.guardian.getAlerts({
+  monitorId: 'mon_abc123',
+  status: 'active',
+  severity: 'critical'
+});
+
+alerts.data.forEach(alert => {
+  console.log(`[${alert.severity}] ${alert.metric}: ${alert.message}`);
+});
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "data": [
+    {
+      "id": "alert_def456",
+      "monitor_id": "mon_abc123",
+      "model_id": "recommendation-v3",
+      "metric": "prediction_drift",
+      "severity": "critical",
+      "status": "active",
+      "value": 0.25,
+      "threshold": 0.2,
+      "message": "Significant prediction drift detected. PSI increased from 0.08 to 0.25 over the last hour.",
+      "details": {
+        "baseline_mean": 0.42,
+        "current_mean": 0.58,
+        "psi_breakdown": {
+          "bucket_1": 0.02,
+          "bucket_2": 0.08,
+          "bucket_3": 0.15
+        }
+      },
+      "triggered_at": "2026-02-01T10:30:00Z",
+      "last_evaluated_at": "2026-02-01T11:00:00Z"
+    },
+    {
+      "id": "alert_ghi789",
+      "monitor_id": "mon_abc123",
+      "model_id": "recommendation-v3",
+      "metric": "error_rate",
+      "severity": "critical",
+      "status": "active",
+      "value": 0.023,
+      "threshold": 0.01,
+      "message": "Error rate exceeded threshold. Current: 2.3%, Threshold: 1%",
+      "details": {
+        "error_breakdown": {
+          "timeout": 45,
+          "invalid_input": 12,
+          "internal_error": 8
+        },
+        "total_requests": 2826
+      },
+      "triggered_at": "2026-02-01T10:45:00Z",
+      "last_evaluated_at": "2026-02-01T11:00:00Z"
+    }
+  ],
+  "has_more": false
+}
+```
+</ResponseExample>
+
+## Acknowledging Alerts
+
+Mark an alert as acknowledged:
+
+```bash
+curl -X POST https://api.rotavision.com/v1/guardian/alerts/alert_def456/acknowledge \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "acknowledged_by": "jane@company.com",
+    "note": "Investigating - may be related to recent model update"
+  }'
+```
+
+## Resolving Alerts
+
+Mark an alert as resolved:
+
+```bash
+curl -X POST https://api.rotavision.com/v1/guardian/alerts/alert_def456/resolve \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resolved_by": "jane@company.com",
+    "resolution": "Rolled back to model v2. Drift caused by training data issue.",
+    "root_cause": "data_quality"
+  }'
+```
+
+<ResponseExample>
+```json 200 - Resolved
+{
+  "id": "alert_def456",
+  "status": "resolved",
+  "resolved_by": "jane@company.com",
+  "resolution": "Rolled back to model v2. Drift caused by training data issue.",
+  "root_cause": "data_quality",
+  "resolved_at": "2026-02-01T12:00:00Z",
+  "duration_minutes": 90
+}
+```
+</ResponseExample>

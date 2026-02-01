@@ -1,0 +1,54 @@
+---
+title: Google Cloud Integration
+description: "Integrate Rotavision with Google Cloud Platform"
+---
+
+## Overview
+
+Rotavision integrates with GCP for data access, Vertex AI monitoring, and Gemini routing.
+
+## Cloud Storage
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Analyze data from GCS
+result = client.vishwas.analyze(
+    model_id="my-model",
+    dataset={
+        "data_url": "gs://my-bucket/predictions.parquet",
+        "gcp_credentials": {
+            "service_account_key": {...}  # JSON key
+        }
+    }
+)
+```
+
+## Vertex AI Integration
+
+Monitor Vertex AI endpoints:
+
+```python
+from rotavision.integrations.gcp import VertexAIMonitor
+
+monitor = VertexAIMonitor(
+    project_id="my-project",
+    endpoint_id="123456789",
+    rotavision_api_key="rv_live_..."
+)
+
+monitor.start()
+```
+
+## Gemini via Sankalp
+
+Route to Gemini through Sankalp:
+
+```python
+response = client.sankalp.proxy(
+    model="gemini-3-pro",
+    messages=[{"role": "user", "content": "Hello"}]
+)
+```

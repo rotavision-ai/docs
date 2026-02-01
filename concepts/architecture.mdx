@@ -1,0 +1,169 @@
+---
+title: Architecture
+description: "Understanding the Rotavision platform architecture"
+---
+
+## Platform Overview
+
+Rotavision is built as a modular, cloud-native platform that integrates seamlessly with your existing ML infrastructure.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Your Application                           │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Rotavision SDK Layer                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
+│  │  Python  │  │ Node.js  │  │   Java   │  │   REST   │        │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Rotavision API Gateway                       │
+│         Authentication │ Rate Limiting │ Request Routing        │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+┌───────────────┐    ┌───────────────┐    ┌───────────────┐
+│    Vishwas    │    │   Guardian    │    │   Dastavez    │
+│   Fairness    │    │  Monitoring   │    │  Document AI  │
+└───────────────┘    └───────────────┘    └───────────────┘
+        │                     │                     │
+        ▼                     ▼                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Shared Infrastructure                        │
+│     Storage │ Compute │ ML Runtime │ Analytics │ Webhooks       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Deployment Options
+
+<CardGroup cols={2}>
+  <Card title="Cloud (Managed)" icon="cloud">
+    **Rotavision Cloud** is the fastest way to get started. We manage all infrastructure, scaling, and updates.
+
+    - Multi-region availability (Mumbai, Singapore)
+    - 99.9% SLA
+    - SOC 2 Type II compliant
+  </Card>
+  <Card title="On-Premise / VPC" icon="server">
+    **Rotavision Enterprise** can be deployed in your own infrastructure for maximum data control.
+
+    - Kubernetes or VM deployment
+    - Air-gapped environments supported
+    - Custom compliance requirements
+  </Card>
+</CardGroup>
+
+## Data Flow
+
+### Synchronous Requests
+
+For real-time operations (explanations, proxy requests):
+
+```
+Client → API Gateway → Product Service → Response
+         (< 100ms)      (< 500ms)
+```
+
+### Asynchronous Jobs
+
+For batch operations (fairness analysis, document extraction):
+
+```
+Client → API Gateway → Job Queue → Worker → Webhook/Polling
+         (< 100ms)                          (seconds-minutes)
+```
+
+<Info>
+  Async jobs return immediately with a `job_id`. Poll the status endpoint or configure webhooks for completion notifications.
+</Info>
+
+## Data Residency
+
+All data processed by Rotavision Cloud is stored in India by default:
+
+| Data Type | Storage Location | Retention |
+|-----------|------------------|-----------|
+| API Requests | Mumbai (AWS ap-south-1) | 90 days |
+| Analysis Results | Mumbai (AWS ap-south-1) | Configurable |
+| Model Artifacts | Customer-specified | Customer-managed |
+| Logs & Metrics | Mumbai (AWS ap-south-1) | 30 days |
+
+<Warning>
+  If you use Sankalp to proxy requests to international LLM providers, your prompts may be processed outside India according to each provider's data policies.
+</Warning>
+
+## Security Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Security Layers                            │
+├─────────────────────────────────────────────────────────────────┤
+│  Transport    │  TLS 1.3, Certificate Pinning                   │
+├───────────────┼─────────────────────────────────────────────────┤
+│  AuthN        │  API Keys, OAuth 2.0, SAML (Enterprise)         │
+├───────────────┼─────────────────────────────────────────────────┤
+│  AuthZ        │  Scoped Keys, RBAC, Resource Policies           │
+├───────────────┼─────────────────────────────────────────────────┤
+│  Data         │  AES-256 at rest, Field-level encryption        │
+├───────────────┼─────────────────────────────────────────────────┤
+│  Network      │  VPC isolation, Private endpoints               │
+├───────────────┼─────────────────────────────────────────────────┤
+│  Audit        │  Immutable logs, SIEM integration               │
+└───────────────┴─────────────────────────────────────────────────┘
+```
+
+## Integration Patterns
+
+### Direct Integration
+
+Call Rotavision APIs directly from your application:
+
+```python
+# In your ML serving code
+prediction = model.predict(features)
+explanation = rotavision.vishwas.explain(model_id, features, prediction)
+```
+
+### Sidecar Pattern
+
+Deploy Rotavision as a sidecar container for transparent monitoring:
+
+```yaml
+# Kubernetes deployment
+containers:
+  - name: ml-model
+    image: your-model:v1
+  - name: rotavision-sidecar
+    image: rotavision/guardian-agent:latest
+    env:
+      - name: ROTAVISION_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: rotavision-credentials
+            key: api-key
+```
+
+### Event-Driven
+
+Process events asynchronously via message queues:
+
+```
+Model Service → Kafka/SQS → Rotavision Consumer → Storage
+```
+
+## High Availability
+
+Rotavision Cloud is designed for 99.9% availability:
+
+- **Multi-AZ deployment** within Mumbai region
+- **Automatic failover** for all stateful services
+- **Circuit breakers** prevent cascade failures
+- **Graceful degradation** maintains core functionality during partial outages
+
+See our [Status Page](https://status.rotavision.com) for real-time availability.

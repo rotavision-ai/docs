@@ -1,0 +1,78 @@
+---
+title: SDK Overview
+description: "Official Rotavision SDKs"
+---
+
+## Official SDKs
+
+Rotavision provides official SDKs for popular programming languages. All SDKs provide:
+
+- Type-safe API interfaces
+- Automatic retries with exponential backoff
+- Request/response logging
+- Error handling with typed exceptions
+
+<CardGroup cols={3}>
+  <Card title="Python" icon="python" href="/sdks/python">
+    Python 3.8+
+  </Card>
+  <Card title="Node.js" icon="node-js" href="/sdks/nodejs">
+    Node.js 18+
+  </Card>
+  <Card title="Java" icon="java" href="/sdks/java">
+    Java 17+
+  </Card>
+</CardGroup>
+
+## Installation
+
+<CodeGroup>
+
+```bash Python
+pip install rotavision
+```
+
+```bash Node.js
+npm install @rotavision/sdk
+```
+
+```xml Java (Maven)
+<dependency>
+    <groupId>com.rotavision</groupId>
+    <artifactId>rotavision-java</artifactId>
+    <version>0.1.0</version>
+</dependency>
+```
+
+</CodeGroup>
+
+## Quick Comparison
+
+| Feature | Python | Node.js | Java |
+|---------|--------|---------|------|
+| Async Support | ✅ asyncio | ✅ Promises | ✅ CompletableFuture |
+| Streaming | ✅ Generators | ✅ AsyncIterator | ✅ Flux (Reactor) |
+| Type Safety | ✅ Type hints | ✅ TypeScript | ✅ Native |
+| Retries | ✅ Built-in | ✅ Built-in | ✅ Built-in |
+
+## Source Code
+
+All SDKs are open source under the Apache 2.0 license:
+
+- **Python**: [github.com/rotavision-ai/python-sdk](https://github.com/rotavision-ai/python-sdk)
+- **Node.js**: [github.com/rotavision-ai/node-sdk](https://github.com/rotavision-ai/node-sdk)
+- **Java**: [github.com/rotavision-ai/java-sdk](https://github.com/rotavision-ai/java-sdk)
+
+## Community SDKs
+
+Community-maintained SDKs (not officially supported):
+
+| Language | Repository | Status |
+|----------|------------|--------|
+| Go | Coming soon | Planned |
+| Ruby | Coming soon | Planned |
+| .NET | Coming soon | Planned |
+
+<Info>
+  Interested in maintaining a community SDK? Contact us at developers@rotavision.com
+</Info>

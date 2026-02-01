@@ -1,0 +1,224 @@
+---
+title: Proxy Request
+api: POST /sankalp/proxy
+description: "Route a request to an LLM provider"
+---
+
+## Request
+
+<ParamField body="model" type="string" required>
+  Model to use. Can be specific (`gpt-5-mini`, `claude-4.5-sonnet`) or `auto` for intelligent routing.
+</ParamField>
+
+<ParamField body="messages" type="array" required>
+  Conversation messages in OpenAI format.
+
+  <Expandable title="message properties">
+    <ParamField body="role" type="string" required>
+      Message role: `system`, `user`, `assistant`.
+    </ParamField>
+    <ParamField body="content" type="string" required>
+      Message content.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="temperature" type="number" default="1.0">
+  Sampling temperature (0-2).
+</ParamField>
+
+<ParamField body="max_tokens" type="integer">
+  Maximum tokens to generate.
+</ParamField>
+
+<ParamField body="stream" type="boolean" default="false">
+  Enable streaming response.
+</ParamField>
+
+<ParamField body="routing" type="object">
+  Routing preferences.
+
+  <Expandable title="routing properties">
+    <ParamField body="optimize" type="string">
+      Optimization target: `cost`, `latency`, `quality`.
+    </ParamField>
+    <ParamField body="data_residency" type="string">
+      Data residency requirement: `india`, `asia`, `any`.
+    </ParamField>
+    <ParamField body="max_latency_ms" type="integer">
+      Maximum acceptable latency.
+    </ParamField>
+    <ParamField body="fallback_models" type="array">
+      Fallback models if primary unavailable.
+    </ParamField>
+    <ParamField body="capabilities" type="array">
+      Required capabilities: `hindi`, `tamil`, `code`, `reasoning`, `vision`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="compliance" type="object">
+  Compliance settings.
+
+  <Expandable title="compliance properties">
+    <ParamField body="log_prompts" type="boolean" default="true">
+      Log prompts for audit.
+    </ParamField>
+    <ParamField body="redact_pii" type="boolean" default="false">
+      Redact PII from logs.
+    </ParamField>
+    <ParamField body="content_filter" type="boolean" default="true">
+      Apply content filtering.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/sankalp/proxy \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5-mini",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant fluent in Hindi."},
+      {"role": "user", "content": "भारत में AI adoption की स्थिति क्या है?"}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 1000
+  }'
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+response = client.sankalp.proxy(
+    model="gpt-5-mini",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant fluent in Hindi."},
+        {"role": "user", "content": "भारत में AI adoption की स्थिति क्या है?"}
+    ],
+    temperature=0.7,
+    max_tokens=1000
+)
+
+print(response.choices[0].message.content)
+
+# With auto-routing
+response = client.sankalp.proxy(
+    model="auto",
+    messages=[...],
+    routing={
+        "optimize": "cost",
+        "data_residency": "india",
+        "capabilities": ["hindi"]
+    }
+)
+```
+
+```typescript Node.js
+import { Rotavision } from '@rotavision/sdk';
+
+const client = new Rotavision();
+
+const response = await client.sankalp.proxy({
+  model: 'gpt-5-mini',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant fluent in Hindi.' },
+    { role: 'user', content: 'भारत में AI adoption की स्थिति क्या है?' }
+  ],
+  temperature: 0.7,
+  maxTokens: 1000
+});
+
+console.log(response.choices[0].message.content);
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "id": "proxy_abc123",
+  "model": "gpt-5-mini",
+  "provider": "openai",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "भारत में AI adoption तेजी से बढ़ रहा है। कुछ मुख्य बिंदु:\n\n1. **एंटरप्राइज़ अपनाना**: बड़ी कंपनियां जैसे TCS, Infosys, और Reliance AI में भारी निवेश कर रही हैं...\n\n2. **स्टार्टअप इकोसिस्टम**: भारत में 3,000+ AI स्टार्टअप्स हैं...\n\n3. **सरकारी पहल**: Digital India और AI Mission के तहत..."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 45,
+    "completion_tokens": 312,
+    "total_tokens": 357
+  },
+  "cost": {
+    "usd": 0.0021,
+    "inr": 0.18
+  },
+  "latency_ms": 1250,
+  "routing": {
+    "selected_model": "gpt-5-mini",
+    "selected_provider": "openai",
+    "reason": "explicit_model_request"
+  },
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+
+```json 200 - Auto-Routed
+{
+  "id": "proxy_def456",
+  "model": "sarvam-large",
+  "provider": "sarvam",
+  "choices": [...],
+  "usage": {
+    "prompt_tokens": 45,
+    "completion_tokens": 298,
+    "total_tokens": 343
+  },
+  "cost": {
+    "usd": 0.0008,
+    "inr": 0.07
+  },
+  "latency_ms": 890,
+  "routing": {
+    "selected_model": "sarvam-large",
+    "selected_provider": "sarvam",
+    "reason": "cost_optimized_with_india_residency",
+    "alternatives_considered": ["krutrim-3", "gpt-5-mini"]
+  }
+}
+```
+</ResponseExample>
+
+## Streaming
+
+For streaming responses, use the stream endpoint or set `stream: true`:
+
+```python
+# Streaming in Python
+for chunk in client.sankalp.proxy_stream(
+    model="claude-4.5-sonnet",
+    messages=[{"role": "user", "content": "Write a poem about India"}]
+):
+    print(chunk.choices[0].delta.content, end="")
+```
+
+```typescript
+// Streaming in Node.js
+const stream = await client.sankalp.proxyStream({
+  model: 'claude-4.5-sonnet',
+  messages: [{ role: 'user', content: 'Write a poem about India' }]
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0].delta.content || '');
+}
+```

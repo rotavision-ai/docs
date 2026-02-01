@@ -1,0 +1,124 @@
+---
+title: Get Usage
+api: GET /sankalp/usage
+description: "Get usage statistics and costs"
+---
+
+## Request
+
+<ParamField query="start_date" type="string">
+  Start date (ISO 8601). Defaults to start of current month.
+</ParamField>
+
+<ParamField query="end_date" type="string">
+  End date (ISO 8601). Defaults to now.
+</ParamField>
+
+<ParamField query="group_by" type="string">
+  Group results by: `day`, `week`, `month`, `model`, `provider`.
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl "https://api.rotavision.com/v1/sankalp/usage?start_date=2026-01-01&group_by=model" \
+  -H "Authorization: Bearer rv_live_..."
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+usage = client.sankalp.get_usage(
+    start_date="2026-01-01",
+    group_by="model"
+)
+
+print(f"Total cost: ₹{usage.total_cost.inr}")
+for item in usage.breakdown:
+    print(f"  {item.model}: {item.requests} requests, ₹{item.cost.inr}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "period": {
+    "start": "2026-01-01T00:00:00Z",
+    "end": "2026-02-01T10:30:00Z"
+  },
+  "summary": {
+    "total_requests": 125430,
+    "total_tokens": {
+      "input": 45678900,
+      "output": 23456780,
+      "total": 69135680
+    },
+    "total_cost": {
+      "usd": 234.56,
+      "inr": 19540.23
+    },
+    "avg_latency_ms": 1250
+  },
+  "breakdown": [
+    {
+      "model": "gpt-5-mini",
+      "provider": "openai",
+      "requests": 45000,
+      "tokens": {
+        "input": 18000000,
+        "output": 9000000,
+        "total": 27000000
+      },
+      "cost": {
+        "usd": 108.00,
+        "inr": 9000.00
+      },
+      "avg_latency_ms": 1100
+    },
+    {
+      "model": "sarvam-large",
+      "provider": "sarvam",
+      "requests": 52000,
+      "tokens": {
+        "input": 15678900,
+        "output": 8456780,
+        "total": 24135680
+      },
+      "cost": {
+        "usd": 48.27,
+        "inr": 4022.50
+      },
+      "avg_latency_ms": 890
+    },
+    {
+      "model": "claude-4.5-sonnet",
+      "provider": "anthropic",
+      "requests": 28430,
+      "tokens": {
+        "input": 12000000,
+        "output": 6000000,
+        "total": 18000000
+      },
+      "cost": {
+        "usd": 78.29,
+        "inr": 6524.17
+      },
+      "avg_latency_ms": 1650
+    }
+  ],
+  "daily_trend": [
+    {
+      "date": "2026-01-31",
+      "requests": 4521,
+      "cost": {"usd": 8.42, "inr": 701.67}
+    },
+    {
+      "date": "2026-02-01",
+      "requests": 2341,
+      "cost": {"usd": 4.21, "inr": 350.83}
+    }
+  ]
+}
+```
+</ResponseExample>

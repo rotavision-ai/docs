@@ -1,0 +1,218 @@
+---
+title: Generate Report
+api: POST /vishwas/reports
+description: "Generate compliance-ready audit reports for AI fairness"
+---
+
+## Request
+
+<ParamField body="analysis_id" type="string" required>
+  ID of a completed fairness analysis to generate report from.
+</ParamField>
+
+<ParamField body="template" type="string" default="standard">
+  Report template:
+  - `standard` - General fairness report
+  - `rbi` - RBI AI/ML guidelines compliance
+  - `sebi` - SEBI circular compliance
+  - `irdai` - IRDAI AI guidelines compliance
+  - `internal` - Internal audit format
+</ParamField>
+
+<ParamField body="format" type="string" default="pdf">
+  Output format: `pdf`, `html`, `json`.
+</ParamField>
+
+<ParamField body="include_sections" type="array">
+  Sections to include. Defaults to all:
+  - `executive_summary`
+  - `methodology`
+  - `metrics_detail`
+  - `group_analysis`
+  - `recommendations`
+  - `appendix`
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Additional metadata to include in the report.
+
+  <Expandable title="metadata properties">
+    <ParamField body="model_name" type="string">
+      Human-readable model name.
+    </ParamField>
+    <ParamField body="model_version" type="string">
+      Model version string.
+    </ParamField>
+    <ParamField body="model_owner" type="string">
+      Team or individual responsible.
+    </ParamField>
+    <ParamField body="business_context" type="string">
+      Description of model's business use.
+    </ParamField>
+    <ParamField body="review_date" type="string">
+      Date of review (ISO 8601).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="webhook_url" type="string">
+  URL to receive webhook when report is ready.
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique report identifier.
+</ResponseField>
+
+<ResponseField name="analysis_id" type="string">
+  The analysis this report is based on.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Report status: `pending`, `generating`, `completed`, `failed`.
+</ResponseField>
+
+<ResponseField name="download_url" type="string">
+  URL to download the report (available when completed).
+</ResponseField>
+
+<ResponseField name="expires_at" type="string">
+  When the download URL expires.
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/vishwas/reports \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "analysis_id": "analysis_abc123xyz",
+    "template": "rbi",
+    "format": "pdf",
+    "metadata": {
+      "model_name": "Loan Approval Model",
+      "model_version": "2.3.1",
+      "model_owner": "Credit Risk Team",
+      "business_context": "Retail loan underwriting for personal loans up to ₹10 lakhs",
+      "review_date": "2026-02-01"
+    }
+  }'
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+report = client.vishwas.generate_report(
+    analysis_id="analysis_abc123xyz",
+    template="rbi",
+    format="pdf",
+    metadata={
+        "model_name": "Loan Approval Model",
+        "model_version": "2.3.1",
+        "model_owner": "Credit Risk Team",
+        "business_context": "Retail loan underwriting for personal loans up to ₹10 lakhs",
+        "review_date": "2026-02-01"
+    }
+)
+
+# Poll for completion or use webhooks
+report = client.vishwas.get_report(report.id)
+if report.status == "completed":
+    print(f"Download: {report.download_url}")
+```
+
+```typescript Node.js
+import { Rotavision } from '@rotavision/sdk';
+
+const client = new Rotavision();
+
+const report = await client.vishwas.generateReport({
+  analysisId: 'analysis_abc123xyz',
+  template: 'rbi',
+  format: 'pdf',
+  metadata: {
+    modelName: 'Loan Approval Model',
+    modelVersion: '2.3.1',
+    modelOwner: 'Credit Risk Team',
+    businessContext: 'Retail loan underwriting for personal loans up to ₹10 lakhs',
+    reviewDate: '2026-02-01'
+  }
+});
+
+// Poll for completion
+const completedReport = await client.vishwas.getReport(report.id);
+if (completedReport.status === 'completed') {
+  console.log(`Download: ${completedReport.downloadUrl}`);
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```json 202 - Generating
+{
+  "id": "report_def456",
+  "analysis_id": "analysis_abc123xyz",
+  "template": "rbi",
+  "format": "pdf",
+  "status": "generating",
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+
+```json 200 - Completed
+{
+  "id": "report_def456",
+  "analysis_id": "analysis_abc123xyz",
+  "template": "rbi",
+  "format": "pdf",
+  "status": "completed",
+  "download_url": "https://storage.rotavision.com/reports/report_def456.pdf?token=...",
+  "expires_at": "2026-02-02T10:30:00Z",
+  "pages": 24,
+  "sections": [
+    "executive_summary",
+    "methodology",
+    "metrics_detail",
+    "group_analysis",
+    "recommendations",
+    "regulatory_mapping",
+    "appendix"
+  ],
+  "created_at": "2026-02-01T10:30:00Z",
+  "completed_at": "2026-02-01T10:31:45Z"
+}
+```
+</ResponseExample>
+
+## Report Templates
+
+### RBI Template
+
+The RBI template maps your fairness analysis to the Reserve Bank of India's guidelines on AI/ML in financial services:
+
+- **Section 1**: Executive summary with compliance status
+- **Section 2**: Model governance and documentation
+- **Section 3**: Fairness metrics mapped to RBI requirements
+- **Section 4**: Protected group analysis (gender, geography, income)
+- **Section 5**: Explainability assessment
+- **Section 6**: Recommendations and remediation plan
+- **Appendix**: Technical methodology and data sources
+
+### SEBI Template
+
+For capital markets applications per SEBI circulars:
+
+- Focus on model risk assessment
+- Audit trail documentation
+- Performance monitoring requirements
+
+### IRDAI Template
+
+For insurance applications:
+
+- Pricing fairness analysis
+- Claims processing equity
+- Underwriting bias assessment

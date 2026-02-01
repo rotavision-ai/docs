@@ -1,0 +1,143 @@
+---
+title: LangChain Integration
+description: "Add Rotavision trust & monitoring to LangChain apps"
+---
+
+## Overview
+
+Integrate Rotavision with LangChain to add fairness monitoring, explainability, and reliability tracking to your LLM applications.
+
+## Installation
+
+```bash
+pip install rotavision langchain
+```
+
+## Sankalp as LangChain LLM
+
+Use Sankalp as your LangChain LLM for unified routing and monitoring:
+
+```python
+from langchain.llms import BaseLLM
+from rotavision.integrations.langchain import SankalpLLM
+
+# Create Sankalp-backed LLM
+llm = SankalpLLM(
+    api_key="rv_live_...",
+    model="gpt-5-mini",
+    routing={
+        "optimize": "cost",
+        "data_residency": "india"
+    }
+)
+
+# Use with LangChain
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+
+prompt = PromptTemplate(
+    input_variables=["topic"],
+    template="Write a brief summary about {topic}"
+)
+
+chain = LLMChain(llm=llm, prompt=prompt)
+result = chain.run("AI adoption in India")
+```
+
+## Callback Handler for Monitoring
+
+Add Guardian monitoring to any LangChain app:
+
+```python
+from langchain.callbacks import BaseCallbackHandler
+from rotavision.integrations.langchain import GuardianCallbackHandler
+
+# Create callback handler
+guardian_callback = GuardianCallbackHandler(
+    api_key="rv_live_...",
+    monitor_id="mon_abc123"
+)
+
+# Use with any LangChain component
+from langchain.chat_models import ChatOpenAI
+
+llm = ChatOpenAI(
+    callbacks=[guardian_callback]
+)
+
+# All LLM calls are automatically logged to Guardian
+response = llm.predict("Hello, world!")
+```
+
+## RAG with Fairness Monitoring
+
+Monitor your RAG pipeline for fairness:
+
+```python
+from langchain.chains import RetrievalQA
+from langchain.vectorstores import Chroma
+from rotavision.integrations.langchain import FairnessMonitor
+
+# Create fairness monitor
+fairness_monitor = FairnessMonitor(
+    api_key="rv_live_...",
+    protected_attributes=["language", "region"]
+)
+
+# Wrap your retriever
+monitored_retriever = fairness_monitor.wrap_retriever(
+    retriever=vectorstore.as_retriever()
+)
+
+# Use in RAG chain
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=monitored_retriever
+)
+
+# Queries are analyzed for fairness across protected groups
+result = qa_chain.run("What are the loan eligibility criteria?")
+```
+
+## Agent Monitoring
+
+Monitor LangChain agents:
+
+```python
+from langchain.agents import initialize_agent, Tool
+from rotavision.integrations.langchain import AgentMonitor
+
+agent_monitor = AgentMonitor(
+    api_key="rv_live_...",
+    log_thoughts=True,
+    log_actions=True
+)
+
+agent = initialize_agent(
+    tools=tools,
+    llm=llm,
+    agent="zero-shot-react-description",
+    callbacks=[agent_monitor]
+)
+
+# Agent reasoning and actions are logged
+result = agent.run("Research the latest EV sales in India")
+```
+
+## LCEL Integration
+
+Works with LangChain Expression Language:
+
+```python
+from langchain.schema.runnable import RunnablePassthrough
+from rotavision.integrations.langchain import rotavision_middleware
+
+# Add Rotavision middleware to any chain
+chain = (
+    {"context": retriever, "question": RunnablePassthrough()}
+    | rotavision_middleware(api_key="rv_live_...", monitor_id="mon_123")
+    | prompt
+    | llm
+    | output_parser
+)
+```

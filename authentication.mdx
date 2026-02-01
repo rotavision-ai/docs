@@ -1,0 +1,191 @@
+---
+title: Authentication
+description: "Secure your API requests with Rotavision API keys"
+---
+
+## API Keys
+
+All API requests to Rotavision require authentication using an API key. You can create and manage API keys from your [dashboard](https://dashboard.rotavision.com/settings/api-keys).
+
+### Key Types
+
+| Type | Prefix | Usage |
+|------|--------|-------|
+| **Live** | `rv_live_` | Production environments |
+| **Test** | `rv_test_` | Development and testing |
+
+<Warning>
+  Never expose your live API keys in client-side code, public repositories, or logs. Use environment variables or a secrets manager.
+</Warning>
+
+## Authentication Methods
+
+### Bearer Token (Recommended)
+
+Include your API key in the `Authorization` header:
+
+```bash
+curl https://api.rotavision.com/v1/vishwas/analyze \
+  -H "Authorization: Bearer rv_live_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{"model_id": "my-model"}'
+```
+
+### Using SDKs
+
+Our SDKs handle authentication automatically:
+
+<CodeGroup>
+
+```python Python
+from rotavision import Rotavision
+
+# Option 1: Pass directly
+client = Rotavision(api_key="rv_live_...")
+
+# Option 2: Environment variable (recommended)
+# Set ROTAVISION_API_KEY in your environment
+client = Rotavision()
+```
+
+```typescript Node.js
+import { Rotavision } from '@rotavision/sdk';
+
+// Option 1: Pass directly
+const client = new Rotavision({
+  apiKey: 'rv_live_...'
+});
+
+// Option 2: Environment variable (recommended)
+// Set ROTAVISION_API_KEY in your environment
+const client = new Rotavision();
+```
+
+```java Java
+import com.rotavision.Rotavision;
+
+// Option 1: Pass directly
+Rotavision client = new Rotavision("rv_live_...");
+
+// Option 2: Environment variable (recommended)
+// Set ROTAVISION_API_KEY in your environment
+Rotavision client = new Rotavision();
+```
+
+</CodeGroup>
+
+## API Key Scopes
+
+When creating an API key, you can restrict its permissions to specific products:
+
+| Scope | Description |
+|-------|-------------|
+| `vishwas:read` | Read fairness analyses and reports |
+| `vishwas:write` | Create new fairness analyses |
+| `guardian:read` | Read monitoring data and alerts |
+| `guardian:write` | Configure monitors and log inferences |
+| `dastavez:read` | Read extraction results |
+| `dastavez:write` | Submit documents for extraction |
+| `sankalp:proxy` | Make LLM proxy requests |
+| `orchestrate:read` | Read workflow executions |
+| `orchestrate:write` | Create and run workflows |
+| `gati:read` | Read fleet and route data |
+| `gati:write` | Submit optimization requests |
+
+### Example: Read-Only Key
+
+```json
+{
+  "name": "Analytics Dashboard",
+  "scopes": [
+    "vishwas:read",
+    "guardian:read",
+    "gati:read"
+  ]
+}
+```
+
+## Organization & Project Keys
+
+For larger teams, Rotavision supports hierarchical key management:
+
+```
+Organization (Acme Corp)
+├── Project: Production
+│   ├── Key: Backend Service (all scopes)
+│   └── Key: Analytics (read-only)
+├── Project: Staging
+│   └── Key: CI/CD Pipeline
+└── Project: Development
+    └── Key: Local Testing
+```
+
+<Info>
+  Project-scoped keys inherit organization-level rate limits but can have additional restrictions applied.
+</Info>
+
+## IP Allowlisting
+
+For enhanced security, you can restrict API keys to specific IP addresses or CIDR ranges:
+
+```json
+{
+  "name": "Production Backend",
+  "allowed_ips": [
+    "203.0.113.0/24",
+    "198.51.100.42"
+  ]
+}
+```
+
+## Key Rotation
+
+We recommend rotating API keys periodically. The dashboard supports:
+
+1. **Create new key** with the same scopes
+2. **Update your application** with the new key
+3. **Verify functionality** in production
+4. **Revoke the old key**
+
+<Tip>
+  Use a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.) to automate key rotation without application deployments.
+</Tip>
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use environment variables" icon="terminal">
+    Never hardcode API keys in your source code. Use environment variables or a secrets manager.
+
+    ```bash
+    export ROTAVISION_API_KEY=rv_live_...
+    ```
+  </Accordion>
+
+  <Accordion title="Use minimal scopes" icon="lock">
+    Only grant the permissions your application actually needs. A monitoring dashboard doesn't need write access.
+  </Accordion>
+
+  <Accordion title="Separate test and live keys" icon="flask">
+    Use `rv_test_` keys in development and CI/CD. Never use live keys in non-production environments.
+  </Accordion>
+
+  <Accordion title="Monitor key usage" icon="chart-line">
+    Review API key usage in your dashboard. Investigate unexpected patterns or unauthorized access attempts.
+  </Accordion>
+
+  <Accordion title="Enable IP allowlisting" icon="shield">
+    For production keys, restrict access to known IP addresses of your servers.
+  </Accordion>
+</AccordionGroup>
+
+## Rate Limits by Key Type
+
+| Key Type | Requests/min | Requests/day |
+|----------|--------------|--------------|
+| Test | 60 | 1,000 |
+| Live (Starter) | 600 | 50,000 |
+| Live (Growth) | 3,000 | 500,000 |
+| Live (Enterprise) | Custom | Custom |
+
+See [Rate Limits](/concepts/rate-limits) for detailed information.

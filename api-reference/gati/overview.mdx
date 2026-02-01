@@ -1,0 +1,83 @@
+---
+title: Gati Overview
+description: "Fleet & Mobility Intelligence APIs"
+---
+
+## Introduction
+
+Gati provides AI-powered route optimization, demand forecasting, and fleet analytics for logistics and mobility companies.
+
+<CardGroup cols={2}>
+  <Card title="Optimize Routes" icon="route" href="/api-reference/gati/optimize-routes">
+    Find optimal routes for deliveries
+  </Card>
+  <Card title="Track Fleet" icon="location-dot" href="/api-reference/gati/track-fleet">
+    Real-time fleet tracking
+  </Card>
+  <Card title="Predict Demand" icon="chart-line" href="/api-reference/gati/predict-demand">
+    Demand forecasting
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Route Optimization
+
+- **Vehicle Routing Problem (VRP)** solving at scale
+- Support for time windows, capacity constraints
+- Real-time traffic integration
+- Multi-depot and multi-day planning
+
+### Demand Forecasting
+
+- Predict demand by location and time
+- Factor in events, weather, holidays
+- Indian market-specific patterns (festivals, cricket matches)
+
+### Fleet Analytics
+
+- Real-time vehicle tracking
+- Driver performance scoring
+- Maintenance prediction
+- Fuel efficiency analysis
+
+## Quick Example
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Optimize delivery routes
+result = client.gati.optimize_routes(
+    vehicles=[
+        {"id": "v1", "capacity": 100, "start_location": {"lat": 12.97, "lng": 77.59}},
+        {"id": "v2", "capacity": 100, "start_location": {"lat": 12.97, "lng": 77.59}}
+    ],
+    orders=[
+        {"id": "o1", "location": {"lat": 12.93, "lng": 77.63}, "demand": 10, "time_window": ["09:00", "12:00"]},
+        {"id": "o2", "location": {"lat": 12.95, "lng": 77.55}, "demand": 15, "time_window": ["10:00", "14:00"]},
+        # ... more orders
+    ],
+    options={
+        "optimize_for": "distance",
+        "traffic": True,
+        "return_to_depot": True
+    }
+)
+
+for route in result.routes:
+    print(f"Vehicle {route.vehicle_id}: {len(route.stops)} stops, {route.distance_km:.1f} km")
+```
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/gati/routes/optimize` | Optimize routes |
+| `GET` | `/gati/routes/{id}` | Get optimization result |
+| `POST` | `/gati/fleet/track` | Update vehicle locations |
+| `GET` | `/gati/fleet/vehicles` | List vehicles |
+| `GET` | `/gati/fleet/vehicles/{id}` | Get vehicle details |
+| `POST` | `/gati/demand/predict` | Predict demand |
+| `GET` | `/gati/analytics/summary` | Fleet analytics |

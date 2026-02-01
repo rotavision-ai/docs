@@ -1,0 +1,244 @@
+---
+title: Rate Limits
+description: "Understanding API rate limits and quotas"
+---
+
+## Overview
+
+Rotavision applies rate limits to ensure fair usage and platform stability. Limits are applied per API key and vary by plan.
+
+## Rate Limit Tiers
+
+| Plan | Requests/min | Requests/day | Concurrent |
+|------|-------------:|-------------:|-----------:|
+| **Free** | 20 | 500 | 2 |
+| **Starter** | 60 | 5,000 | 5 |
+| **Growth** | 600 | 50,000 | 20 |
+| **Enterprise** | 3,000 | 500,000 | 100 |
+| **Custom** | Unlimited | Unlimited | Custom |
+
+<Info>
+  Enterprise and Custom plans can request higher limits. Contact sales@rotavision.com.
+</Info>
+
+## Product-Specific Limits
+
+Some products have additional limits beyond the base rate:
+
+### Vishwas (Fairness Analysis)
+
+| Operation | Limit | Notes |
+|-----------|------:|-------|
+| `analyze` | 100/hour | Per model_id |
+| `explain` | 1,000/hour | Real-time explanations |
+| `generate_report` | 20/hour | PDF generation |
+
+### Guardian (Monitoring)
+
+| Operation | Limit | Notes |
+|-----------|------:|-------|
+| `log_inference` | 10,000/min | High-throughput logging |
+| `create_monitor` | 100/day | Monitor creation |
+| `get_alerts` | 600/min | Alert retrieval |
+
+### Dastavez (Document AI)
+
+| Operation | Limit | Notes |
+|-----------|------:|-------|
+| `extract` | 100/min | Document extraction |
+| `create_agent` | 20/hour | Browser agent creation |
+| File size | 50 MB | Per document |
+
+### Sankalp (LLM Gateway)
+
+| Operation | Limit | Notes |
+|-----------|------:|-------|
+| `proxy` | Plan limit | Passthrough to LLM provider |
+| Token throughput | Plan-based | Input + output tokens |
+
+### Orchestrate (Workflows)
+
+| Operation | Limit | Notes |
+|-----------|------:|-------|
+| `create_workflow` | 50/hour | Workflow definitions |
+| `run_workflow` | 500/hour | Workflow executions |
+| Concurrent runs | 10-100 | Plan-based |
+
+### Gati (Fleet Intelligence)
+
+| Operation | Limit | Notes |
+|-----------|------:|-------|
+| `optimize_routes` | 100/hour | Route optimization |
+| `track_fleet` | 10,000/min | Vehicle tracking |
+| Vehicles per request | 1,000 | Route optimization |
+
+## Rate Limit Headers
+
+Every API response includes rate limit information:
+
+```
+X-RateLimit-Limit: 600
+X-RateLimit-Remaining: 542
+X-RateLimit-Reset: 1706780400
+```
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed in the window |
+| `X-RateLimit-Remaining` | Requests remaining in current window |
+| `X-RateLimit-Reset` | Unix timestamp when the window resets |
+
+## Handling Rate Limits
+
+When you exceed a rate limit, you'll receive a `429 Too Many Requests` response:
+
+```json
+{
+  "error": {
+    "code": "rate_limit_exceeded",
+    "message": "Rate limit exceeded. Retry after 30 seconds.",
+    "type": "rate_limit_error"
+  }
+}
+```
+
+The response includes a `Retry-After` header indicating when to retry:
+
+```
+Retry-After: 30
+```
+
+### Recommended Retry Strategy
+
+<CodeGroup>
+
+```python Python
+import time
+from rotavision import Rotavision
+from rotavision.exceptions import RateLimitError
+
+client = Rotavision()
+
+def call_with_backoff(func, max_retries=5):
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except RateLimitError as e:
+            if attempt == max_retries - 1:
+                raise
+
+            # Use Retry-After header or exponential backoff
+            wait_time = e.retry_after or (2 ** attempt)
+            print(f"Rate limited. Waiting {wait_time}s...")
+            time.sleep(wait_time)
+
+# Usage
+result = call_with_backoff(
+    lambda: client.vishwas.analyze(model_id="my-model", dataset=data)
+)
+```
+
+```typescript Node.js
+import { Rotavision } from '@rotavision/sdk';
+import { RateLimitError } from '@rotavision/sdk/errors';
+
+const client = new Rotavision();
+
+async function callWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries = 5
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (!(e instanceof RateLimitError) || attempt === maxRetries - 1) {
+        throw e;
+      }
+
+      const waitTime = e.retryAfter || Math.pow(2, attempt);
+      console.log(`Rate limited. Waiting ${waitTime}s...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
+// Usage
+const result = await callWithBackoff(() =>
+  client.vishwas.analyze({ modelId: 'my-model', dataset: data })
+);
+```
+
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Implement exponential backoff" icon="clock">
+    Don't retry immediately after a rate limit. Use exponential backoff with jitter to avoid thundering herd.
+  </Accordion>
+
+  <Accordion title="Cache responses when possible" icon="database">
+    Cache analysis results and explanations that don't change frequently to reduce API calls.
+  </Accordion>
+
+  <Accordion title="Use batch endpoints" icon="layer-group">
+    For Guardian logging, use batch endpoints to send multiple inferences in one request.
+
+    ```python
+    # Instead of
+    for inference in inferences:
+        client.guardian.log_inference(inference)
+
+    # Use batch endpoint
+    client.guardian.log_inferences(inferences)  # Up to 1000 per call
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor your usage" icon="chart-line">
+    Track your rate limit headers and set up alerts before hitting limits.
+  </Accordion>
+
+  <Accordion title="Use webhooks instead of polling" icon="bell">
+    For async operations, use webhooks instead of polling status endpoints.
+  </Accordion>
+</AccordionGroup>
+
+## Quota Management
+
+Beyond rate limits, some resources have monthly quotas:
+
+| Resource | Starter | Growth | Enterprise |
+|----------|--------:|-------:|-----------:|
+| Documents processed | 1,000 | 10,000 | 100,000+ |
+| LLM tokens (Sankalp) | 1M | 10M | 100M+ |
+| Storage (GB) | 10 | 100 | 1,000+ |
+| Monitors | 5 | 25 | Unlimited |
+
+Check your quota usage in the dashboard or via API:
+
+```bash
+curl https://api.rotavision.com/v1/usage \
+  -H "Authorization: Bearer rv_live_..."
+```
+
+```json
+{
+  "period": "2026-02",
+  "documents_processed": 847,
+  "documents_limit": 10000,
+  "tokens_used": 2450000,
+  "tokens_limit": 10000000,
+  "storage_used_gb": 12.4,
+  "storage_limit_gb": 100
+}
+```
+
+## Requesting Higher Limits
+
+If you need higher rate limits:
+
+1. **Growth Plan**: Upgrade via dashboard for 10x limits
+2. **Enterprise Plan**: Contact sales for custom limits
+3. **Temporary Increase**: Contact support for short-term increases during migrations or load tests

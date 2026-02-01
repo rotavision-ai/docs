@@ -1,0 +1,271 @@
+---
+title: Model Monitoring Guide
+description: "Set up production monitoring with Guardian"
+---
+
+## Overview
+
+Guardian provides real-time monitoring for AI models in production. This guide covers setting up comprehensive monitoring for drift detection, performance tracking, and alerting.
+
+## Quick Start
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Create a monitor
+monitor = client.guardian.create_monitor(
+    model_id="recommendation-v3",
+    name="Prod Recommendations",
+    metrics=["prediction_drift", "data_drift", "latency_p99", "error_rate"],
+    alerts=[
+        {"metric": "prediction_drift", "threshold": 0.1, "severity": "warning"},
+        {"metric": "prediction_drift", "threshold": 0.2, "severity": "critical"},
+        {"metric": "error_rate", "threshold": 0.01, "severity": "critical"},
+    ]
+)
+
+print(f"Monitor created: {monitor.id}")
+```
+
+## Integrating with Your Serving Code
+
+### Basic Integration
+
+```python
+# In your model serving code
+import time
+from rotavision import Rotavision
+
+client = Rotavision()
+MONITOR_ID = "mon_abc123"
+
+def predict(features):
+    start = time.time()
+
+    try:
+        prediction = model.predict(features)
+        latency_ms = (time.time() - start) * 1000
+
+        # Log to Guardian
+        client.guardian.log_inference(
+            monitor_id=MONITOR_ID,
+            input_data=features,
+            prediction=prediction,
+            latency_ms=latency_ms
+        )
+
+        return prediction
+
+    except Exception as e:
+        # Log error
+        client.guardian.log_inference(
+            monitor_id=MONITOR_ID,
+            input_data=features,
+            error={"code": type(e).__name__, "message": str(e)}
+        )
+        raise
+```
+
+### Async/Batch Integration (Recommended)
+
+For production workloads, use async logging to minimize latency impact:
+
+```python
+from rotavision.logging import AsyncLogger
+
+# Create async logger
+logger = AsyncLogger(
+    api_key="rv_live_...",
+    monitor_id="mon_abc123",
+    batch_size=100,       # Send in batches of 100
+    flush_interval_ms=1000  # Or flush every second
+)
+
+def predict(features):
+    start = time.time()
+    prediction = model.predict(features)
+    latency_ms = (time.time() - start) * 1000
+
+    # Non-blocking log
+    logger.log(
+        input_data=features,
+        prediction=prediction,
+        latency_ms=latency_ms
+    )
+
+    return prediction
+
+# Flush on shutdown
+import atexit
+atexit.register(logger.flush)
+```
+
+## Setting Up Drift Detection
+
+### Establishing Baseline
+
+Guardian needs a baseline distribution to detect drift:
+
+```python
+# Option 1: Use historical data
+monitor = client.guardian.create_monitor(
+    model_id="my-model",
+    name="Production Monitor",
+    metrics=["prediction_drift", "data_drift"],
+    baseline={
+        "data_url": "s3://my-bucket/baseline-data.parquet"
+    }
+)
+
+# Option 2: Use rolling window (learns from recent production data)
+monitor = client.guardian.create_monitor(
+    model_id="my-model",
+    name="Production Monitor",
+    metrics=["prediction_drift", "data_drift"],
+    baseline={
+        "window": "30d"  # Use last 30 days as baseline
+    }
+)
+```
+
+### Drift Metrics
+
+| Metric | Description | Typical Threshold |
+|--------|-------------|-------------------|
+| **PSI** | Population Stability Index | Warning: 0.1, Critical: 0.2 |
+| **KL Divergence** | Kullback-Leibler divergence | Warning: 0.1, Critical: 0.2 |
+| **JS Distance** | Jensen-Shannon distance | Warning: 0.1, Critical: 0.15 |
+| **KS Statistic** | Kolmogorov-Smirnov test | Warning: 0.05, Critical: 0.1 |
+
+## Configuring Alerts
+
+### Alert Channels
+
+```python
+monitor = client.guardian.create_monitor(
+    model_id="my-model",
+    name="Production Monitor",
+    metrics=["prediction_drift", "error_rate"],
+    alerts=[
+        {
+            "metric": "prediction_drift",
+            "threshold": 0.2,
+            "severity": "critical",
+            "window": "1h"  # Evaluate over 1 hour
+        }
+    ],
+    notifications={
+        "email": ["ml-team@company.com", "oncall@company.com"],
+        "slack_webhook": "https://hooks.slack.com/services/...",
+        "pagerduty_key": "your-pagerduty-key"
+    }
+)
+```
+
+### Alert Severity Levels
+
+| Severity | Use Case | Response |
+|----------|----------|----------|
+| `info` | FYI notifications | Review when convenient |
+| `warning` | Potential issues | Investigate within 24h |
+| `critical` | Immediate attention | Page on-call engineer |
+
+## Viewing Metrics
+
+### Dashboard
+
+Access the monitoring dashboard at:
+```
+https://dashboard.rotavision.com/monitors/{monitor_id}
+```
+
+### API
+
+```python
+# Get current metrics
+metrics = client.guardian.get_metrics(
+    monitor_id="mon_abc123",
+    start_time="2026-02-01T00:00:00Z",
+    end_time="2026-02-01T12:00:00Z",
+    granularity="hour"
+)
+
+for point in metrics.data:
+    print(f"{point.timestamp}: PSI={point.prediction_drift:.3f}, P99={point.latency_p99}ms")
+```
+
+## Handling Alerts
+
+### Acknowledging
+
+```python
+# Acknowledge alert (stops repeat notifications)
+client.guardian.acknowledge_alert(
+    alert_id="alert_xyz789",
+    acknowledged_by="jane@company.com",
+    note="Investigating - may be related to data pipeline issue"
+)
+```
+
+### Resolving
+
+```python
+# Resolve alert with root cause
+client.guardian.resolve_alert(
+    alert_id="alert_xyz789",
+    resolved_by="jane@company.com",
+    resolution="Rolled back model to v2 due to training data issue",
+    root_cause="data_quality"  # For analytics
+)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start with key metrics" icon="bullseye">
+    Begin with essential metrics:
+    - `prediction_drift` - Catches distribution shifts
+    - `latency_p99` - Performance degradation
+    - `error_rate` - System health
+
+    Add more granular metrics as you learn your model's failure modes.
+  </Accordion>
+
+  <Accordion title="Set appropriate thresholds" icon="sliders">
+    - Start with conservative thresholds (more alerts)
+    - Tune based on false positive rate
+    - Different models may need different thresholds
+  </Accordion>
+
+  <Accordion title="Use async logging" icon="bolt">
+    Never block your serving path with synchronous logging. Use the AsyncLogger or batch endpoints.
+  </Accordion>
+
+  <Accordion title="Log ground truth when available" icon="check">
+    If you can obtain ground truth labels later:
+
+    ```python
+    # Log prediction
+    logger.log(inference_id="inf_123", prediction=pred)
+
+    # Later, when ground truth is available
+    client.guardian.update_inference(
+        inference_id="inf_123",
+        actual=actual_outcome
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Bias Detection" icon="scale-balanced" href="/guides/bias-detection">
+    Add fairness monitoring to your pipeline
+  </Card>
+  <Card title="Guardian API Reference" icon="code" href="/api-reference/guardian/overview">
+    Full API documentation
+  </Card>
+</CardGroup>

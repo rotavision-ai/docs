@@ -1,0 +1,211 @@
+---
+title: Quickstart
+description: "Get started with Rotavision in under 5 minutes"
+---
+
+## Prerequisites
+
+Before you begin, you'll need:
+
+- A Rotavision account ([sign up here](https://rotavision.com/signup))
+- An API key from your [dashboard](https://dashboard.rotavision.com)
+- Python 3.8+, Node.js 18+, or Java 17+
+
+## Installation
+
+Install the Rotavision SDK for your preferred language:
+
+<CodeGroup>
+
+```bash Python
+pip install rotavision
+```
+
+```bash Node.js
+npm install @rotavision/sdk
+```
+
+```xml Java (Maven)
+<dependency>
+    <groupId>com.rotavision</groupId>
+    <artifactId>rotavision-java</artifactId>
+    <version>0.1.0</version>
+</dependency>
+```
+
+```groovy Java (Gradle)
+implementation 'com.rotavision:rotavision-java:0.1.0'
+```
+
+</CodeGroup>
+
+## Initialize the Client
+
+<CodeGroup>
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision(api_key="rv_live_...")
+
+# Or use environment variable ROTAVISION_API_KEY
+client = Rotavision()
+```
+
+```typescript Node.js
+import { Rotavision } from '@rotavision/sdk';
+
+const client = new Rotavision({
+  apiKey: 'rv_live_...'
+});
+
+// Or use environment variable ROTAVISION_API_KEY
+const client = new Rotavision();
+```
+
+```java Java
+import com.rotavision.Rotavision;
+
+Rotavision client = new Rotavision("rv_live_...");
+
+// Or use environment variable ROTAVISION_API_KEY
+Rotavision client = new Rotavision();
+```
+
+</CodeGroup>
+
+## Your First API Call
+
+Let's analyze a model prediction for fairness using **Vishwas**:
+
+<CodeGroup>
+
+```python Python
+# Analyze fairness of a loan approval model
+result = client.vishwas.analyze(
+    model_id="loan-approval-v2",
+    dataset={
+        "features": ["age", "income", "credit_score", "gender", "location"],
+        "predictions": predictions,
+        "actuals": actuals,
+        "protected_attributes": ["gender", "location"]
+    },
+    metrics=["demographic_parity", "equalized_odds", "calibration"]
+)
+
+print(f"Fairness Score: {result.overall_score}")
+print(f"Bias Detected: {result.bias_detected}")
+
+for metric in result.metrics:
+    print(f"  {metric.name}: {metric.value:.3f} ({metric.status})")
+```
+
+```typescript Node.js
+// Analyze fairness of a loan approval model
+const result = await client.vishwas.analyze({
+  modelId: 'loan-approval-v2',
+  dataset: {
+    features: ['age', 'income', 'credit_score', 'gender', 'location'],
+    predictions: predictions,
+    actuals: actuals,
+    protectedAttributes: ['gender', 'location']
+  },
+  metrics: ['demographic_parity', 'equalized_odds', 'calibration']
+});
+
+console.log(`Fairness Score: ${result.overallScore}`);
+console.log(`Bias Detected: ${result.biasDetected}`);
+
+result.metrics.forEach(metric => {
+  console.log(`  ${metric.name}: ${metric.value.toFixed(3)} (${metric.status})`);
+});
+```
+
+```java Java
+// Analyze fairness of a loan approval model
+Vishwas.AnalyzeResult result = client.vishwas().analyze(
+    new Vishwas.AnalyzeRequest()
+        .modelId("loan-approval-v2")
+        .dataset(dataset)
+        .protectedAttributes(Arrays.asList("gender", "location"))
+        .metrics(Arrays.asList("demographic_parity", "equalized_odds"))
+);
+
+System.out.println("Fairness Score: " + result.getOverallScore());
+System.out.println("Bias Detected: " + result.isBiasDetected());
+```
+
+</CodeGroup>
+
+## Example Response
+
+```json
+{
+  "id": "analysis_abc123",
+  "model_id": "loan-approval-v2",
+  "overall_score": 0.82,
+  "bias_detected": true,
+  "metrics": [
+    {
+      "name": "demographic_parity",
+      "value": 0.78,
+      "threshold": 0.80,
+      "status": "warning",
+      "affected_groups": ["location:rural"]
+    },
+    {
+      "name": "equalized_odds",
+      "value": 0.91,
+      "threshold": 0.80,
+      "status": "pass"
+    },
+    {
+      "name": "calibration",
+      "value": 0.85,
+      "threshold": 0.80,
+      "status": "pass"
+    }
+  ],
+  "recommendations": [
+    {
+      "severity": "medium",
+      "message": "Rural applicants have 22% lower approval rate despite similar creditworthiness",
+      "action": "Review feature weights for location-correlated variables"
+    }
+  ],
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Authentication"
+    icon="key"
+    href="/authentication"
+  >
+    Learn about API keys, scopes, and security best practices
+  </Card>
+  <Card
+    title="Vishwas Deep Dive"
+    icon="scale-balanced"
+    href="/api-reference/vishwas/overview"
+  >
+    Explore all fairness metrics and explanation methods
+  </Card>
+  <Card
+    title="Set Up Monitoring"
+    icon="chart-line"
+    href="/guides/model-monitoring"
+  >
+    Configure Guardian to monitor your models in production
+  </Card>
+  <Card
+    title="Extract Documents"
+    icon="file-lines"
+    href="/guides/document-extraction"
+  >
+    Use Dastavez to process Indian documents
+  </Card>
+</CardGroup>

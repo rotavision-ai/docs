@@ -1,0 +1,70 @@
+---
+title: Azure Integration
+description: "Integrate Rotavision with Microsoft Azure"
+---
+
+## Overview
+
+Rotavision integrates with Azure for data access, ML monitoring, and Azure OpenAI routing.
+
+## Blob Storage
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Analyze data from Azure Blob
+result = client.vishwas.analyze(
+    model_id="my-model",
+    dataset={
+        "data_url": "https://myaccount.blob.core.windows.net/container/data.parquet",
+        "azure_credentials": {
+            "connection_string": "DefaultEndpointsProtocol=https;..."
+        }
+    }
+)
+```
+
+## Azure ML Integration
+
+Monitor models deployed on Azure ML:
+
+```python
+from rotavision.integrations.azure import AzureMLMonitor
+
+monitor = AzureMLMonitor(
+    workspace_name="my-workspace",
+    endpoint_name="my-endpoint",
+    rotavision_api_key="rv_live_..."
+)
+
+monitor.start()
+```
+
+## Azure OpenAI
+
+Route Sankalp requests via Azure OpenAI:
+
+```python
+response = client.sankalp.proxy(
+    model="gpt-4",
+    messages=[{"role": "user", "content": "Hello"}],
+    routing={
+        "provider": "azure_openai"
+    }
+)
+```
+
+Configure Azure OpenAI in dashboard:
+
+```python
+client.integrations.configure(
+    provider="azure_openai",
+    config={
+        "endpoint": "https://my-resource.openai.azure.com",
+        "api_key": "...",
+        "deployment_id": "gpt-4-deployment"
+    }
+)
+```

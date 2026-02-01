@@ -1,0 +1,257 @@
+---
+title: Java SDK
+description: "Official Java SDK for Rotavision"
+---
+
+## Installation
+
+### Maven
+
+```xml
+<dependency>
+    <groupId>com.rotavision</groupId>
+    <artifactId>rotavision-java</artifactId>
+    <version>0.1.0</version>
+</dependency>
+```
+
+### Gradle
+
+```groovy
+implementation 'com.rotavision:rotavision-java:0.1.0'
+```
+
+Requirements: Java 17+
+
+## Quick Start
+
+```java
+import com.rotavision.Rotavision;
+
+// Initialize client
+Rotavision client = new Rotavision("rv_live_...");
+
+// Or use environment variable ROTAVISION_API_KEY
+Rotavision client = new Rotavision();
+
+// Use any product
+Vishwas.AnalyzeResult result = client.vishwas().analyze(
+    new Vishwas.AnalyzeRequest()
+        .modelId("my-model")
+        .dataset(dataset)
+);
+```
+
+## Configuration
+
+```java
+import com.rotavision.Rotavision;
+import com.rotavision.RotavisionConfig;
+
+RotavisionConfig config = RotavisionConfig.builder()
+    .apiKey("rv_live_...")
+    .baseUrl("https://api.rotavision.com")
+    .timeout(Duration.ofSeconds(30))
+    .maxRetries(3)
+    .build();
+
+Rotavision client = new Rotavision(config);
+```
+
+## Products
+
+### Vishwas - Fairness & Explainability
+
+```java
+import com.rotavision.Vishwas;
+
+// Analyze fairness
+Vishwas.AnalyzeResult analysis = client.vishwas().analyze(
+    new Vishwas.AnalyzeRequest()
+        .modelId("loan-model")
+        .dataset(new Dataset()
+            .features(Arrays.asList("age", "income", "gender"))
+            .predictions(predictions)
+            .actuals(actuals)
+            .protectedAttributes(Arrays.asList("gender")))
+        .metrics(Arrays.asList("demographic_parity", "equalized_odds"))
+);
+
+System.out.println("Score: " + analysis.getOverallScore());
+System.out.println("Bias: " + analysis.isBiasDetected());
+
+// Explain prediction
+Vishwas.ExplainResult explanation = client.vishwas().explain(
+    new Vishwas.ExplainRequest()
+        .modelId("loan-model")
+        .inputData(Map.of("age", 30, "income", 50000))
+        .prediction(0.75)
+        .method("shap")
+);
+
+System.out.println(explanation.getSummary());
+```
+
+### Guardian - Monitoring
+
+```java
+import com.rotavision.Guardian;
+
+// Create monitor
+Guardian.Monitor monitor = client.guardian().createMonitor(
+    new Guardian.CreateMonitorRequest()
+        .modelId("recommendation-model")
+        .name("Prod Monitor")
+        .metrics(Arrays.asList("prediction_drift", "latency_p99"))
+        .alerts(Arrays.asList(
+            new Guardian.AlertConfig()
+                .metric("prediction_drift")
+                .threshold(0.2)
+                .severity("critical")
+        ))
+);
+
+// Log inference
+client.guardian().logInference(
+    new Guardian.LogInferenceRequest()
+        .monitorId(monitor.getId())
+        .inputData(features)
+        .prediction(prediction)
+        .latencyMs(45)
+);
+```
+
+### Dastavez - Document AI
+
+```java
+import com.rotavision.Dastavez;
+
+// Extract from document URL
+Dastavez.ExtractResult result = client.dastavez().extract(
+    new Dastavez.ExtractRequest()
+        .documentType("aadhaar")
+        .fileUrl("https://storage.example.com/doc.pdf")
+);
+
+System.out.println("Name: " + result.getFields().get("name"));
+System.out.println("Confidence: " + result.getConfidence());
+
+// From file
+Path filePath = Paths.get("document.pdf");
+Dastavez.ExtractResult result = client.dastavez().extract(
+    new Dastavez.ExtractRequest()
+        .documentType("pan")
+        .file(filePath)
+);
+```
+
+### Sankalp - LLM Gateway
+
+```java
+import com.rotavision.Sankalp;
+
+// Proxy to LLM
+Sankalp.ProxyResult response = client.sankalp().proxy(
+    new Sankalp.ProxyRequest()
+        .model("gpt-5-mini")
+        .messages(Arrays.asList(
+            new Message().role("user").content("Hello!")
+        ))
+);
+
+System.out.println(response.getChoices().get(0).getMessage().getContent());
+```
+
+### Orchestrate - Workflows
+
+```java
+import com.rotavision.Orchestrate;
+
+// Run workflow
+Orchestrate.Execution execution = client.orchestrate().runWorkflow(
+    "wf_abc123",
+    Map.of("query", "Research AI in India")
+);
+
+// Wait for completion
+Orchestrate.Execution result = client.orchestrate()
+    .waitForExecution(execution.getId());
+System.out.println(result.getOutputs());
+```
+
+### Gati - Fleet Intelligence
+
+```java
+import com.rotavision.Gati;
+
+// Optimize routes
+Gati.OptimizeResult result = client.gati().optimizeRoutes(
+    new Gati.OptimizeRequest()
+        .vehicles(Arrays.asList(
+            new Vehicle().id("v1").capacity(100).startLocation(location)
+        ))
+        .orders(Arrays.asList(
+            new Order().id("o1").location(loc).demand(10)
+        ))
+);
+
+for (Gati.Route route : result.getRoutes()) {
+    System.out.printf("Vehicle %s: %d stops%n",
+        route.getVehicleId(), route.getStops().size());
+}
+```
+
+## Async Support
+
+```java
+import java.util.concurrent.CompletableFuture;
+
+// Async API calls
+CompletableFuture<Vishwas.AnalyzeResult> future =
+    client.vishwas().analyzeAsync(request);
+
+future.thenAccept(result -> {
+    System.out.println("Score: " + result.getOverallScore());
+});
+
+// Or with reactive streams (if using Reactor)
+Mono<Vishwas.AnalyzeResult> mono = client.vishwas().analyzeReactive(request);
+```
+
+## Error Handling
+
+```java
+import com.rotavision.exceptions.*;
+
+try {
+    Vishwas.AnalyzeResult result = client.vishwas().analyze(request);
+} catch (AuthenticationException e) {
+    System.out.println("Invalid API key");
+} catch (ValidationException e) {
+    System.out.println("Invalid request: " + e.getParam());
+} catch (RateLimitException e) {
+    System.out.println("Rate limited, retry after " + e.getRetryAfter() + "s");
+} catch (RotavisionException e) {
+    System.out.println("API error: " + e.getMessage());
+}
+```
+
+## Logging
+
+The SDK uses SLF4J for logging. Add your preferred implementation:
+
+```xml
+<!-- Logback -->
+<dependency>
+    <groupId>ch.qos.logback</groupId>
+    <artifactId>logback-classic</artifactId>
+    <version>1.4.11</version>
+</dependency>
+```
+
+```xml
+<!-- logback.xml -->
+<configuration>
+    <logger name="com.rotavision" level="DEBUG"/>
+</configuration>
+```

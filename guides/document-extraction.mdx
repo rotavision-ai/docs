@@ -1,0 +1,276 @@
+---
+title: Document Extraction Guide
+description: "Extract data from Indian documents with Dastavez"
+---
+
+## Overview
+
+Dastavez provides intelligent document extraction optimized for Indian documents including Aadhaar, PAN, GST invoices, and more. This guide covers common extraction workflows.
+
+## Supported Documents
+
+| Category | Documents |
+|----------|-----------|
+| **Identity** | Aadhaar, PAN, Voter ID, Passport, Driving License |
+| **Financial** | Bank Statements, ITR, Form 16, Salary Slips |
+| **Business** | GST Invoice, GST Returns, Company Registration |
+| **Legal** | Property Documents, Rental Agreements |
+
+## Basic Extraction
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Extract from Aadhaar card
+result = client.dastavez.extract(
+    document_type="aadhaar",
+    file_url="https://storage.example.com/aadhaar-scan.pdf"
+)
+
+print(f"Name: {result.fields['name']}")
+print(f"Name (English): {result.fields['name_english']}")
+print(f"DOB: {result.fields['dob']}")
+print(f"Confidence: {result.confidence}")
+```
+
+## Extracting from Different Sources
+
+### From URL
+
+```python
+result = client.dastavez.extract(
+    document_type="pan",
+    file_url="https://storage.example.com/pan-card.jpg"
+)
+```
+
+### From File Upload
+
+```python
+with open("document.pdf", "rb") as f:
+    result = client.dastavez.extract(
+        document_type="gst_invoice",
+        file=f
+    )
+```
+
+### From Base64
+
+```python
+import base64
+
+with open("document.pdf", "rb") as f:
+    base64_content = base64.b64encode(f.read()).decode()
+
+result = client.dastavez.extract(
+    document_type="bank_statement",
+    file_base64=base64_content
+)
+```
+
+## Document-Specific Examples
+
+### Aadhaar Card
+
+```python
+result = client.dastavez.extract(
+    document_type="aadhaar",
+    file_url="...",
+    options={
+        "mask_number": True,  # Returns XXXX-XXXX-1234
+        "extract_photo": True
+    }
+)
+
+# Fields extracted:
+# - name (in original script)
+# - name_english
+# - dob
+# - gender
+# - aadhaar_number (masked if option set)
+# - address (full, line1, line2, city, state, pincode)
+# - photo (if extract_photo=True)
+```
+
+### GST Invoice
+
+```python
+result = client.dastavez.extract(
+    document_type="gst_invoice",
+    file_url="..."
+)
+
+# Fields extracted:
+# - invoice_number
+# - invoice_date
+# - seller (name, gstin, address)
+# - buyer (name, gstin, address)
+# - items[] (description, hsn_code, quantity, unit_price, total)
+# - subtotal, cgst, sgst, igst, total
+# - amount_in_words
+```
+
+### Bank Statement
+
+```python
+result = client.dastavez.extract(
+    document_type="bank_statement",
+    file_url="...",
+    options={
+        "mask_account": True
+    }
+)
+
+# Fields extracted:
+# - bank_name
+# - account_number (masked)
+# - account_holder
+# - statement_period (from, to)
+# - opening_balance
+# - closing_balance
+# - transactions[] (date, description, debit, credit, balance)
+```
+
+## Handling Multi-Page Documents
+
+For documents with multiple pages (like bank statements):
+
+```python
+result = client.dastavez.extract(
+    document_type="bank_statement",
+    file_url="...",
+    options={
+        "pages": "all"  # or "1-5" or [1, 3, 5]
+    }
+)
+
+# Transactions are aggregated across all pages
+print(f"Total transactions: {len(result.fields['transactions'])}")
+```
+
+## Validation and Quality
+
+### Check Confidence Scores
+
+```python
+result = client.dastavez.extract(
+    document_type="aadhaar",
+    file_url="..."
+)
+
+if result.confidence < 0.9:
+    print("Warning: Low confidence extraction")
+    print(f"Confidence: {result.confidence}")
+
+# Per-field confidence
+for field, value in result.fields.items():
+    if hasattr(value, 'confidence'):
+        print(f"{field}: {value.value} (confidence: {value.confidence})")
+```
+
+### Validation Checks
+
+```python
+# Built-in validation for Indian documents
+if result.validation['checksum_valid']:
+    print("Document checksum verified")
+else:
+    print("Warning: Checksum validation failed")
+
+# Aadhaar Verhoeff check
+if result.validation.get('verhoeff_check') == 'pass':
+    print("Aadhaar number is valid")
+```
+
+## Multi-Language Support
+
+Dastavez supports extraction from documents in 12 Indian languages:
+
+```python
+result = client.dastavez.extract(
+    document_type="aadhaar",
+    file_url="...",
+    options={
+        "language_hint": "hi"  # Hindi
+        # Supported: hi, ta, te, bn, mr, gu, kn, ml, pa, or, as, en
+    }
+)
+
+# Names and addresses are returned in both original script and transliterated
+print(f"Name (original): {result.fields['name']}")
+print(f"Name (English): {result.fields['name_english']}")
+```
+
+## Error Handling
+
+```python
+from rotavision.exceptions import (
+    ValidationError,
+    DocumentProcessingError
+)
+
+try:
+    result = client.dastavez.extract(
+        document_type="aadhaar",
+        file_url="..."
+    )
+except ValidationError as e:
+    print(f"Invalid input: {e.message}")
+except DocumentProcessingError as e:
+    if e.code == "unreadable_document":
+        print("Document image is too blurry or damaged")
+    elif e.code == "wrong_document_type":
+        print("Document doesn't match specified type")
+    else:
+        print(f"Processing error: {e.message}")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Image Quality" icon="image">
+    - Minimum 300 DPI for scanned documents
+    - Ensure good lighting and contrast
+    - Avoid shadows and glare
+    - Dastavez auto-enhances images, but quality input = better results
+  </Accordion>
+
+  <Accordion title="Security" icon="shield">
+    - Use `mask_number: True` for Aadhaar
+    - Use `mask_account: True` for bank statements
+    - Store extracted PII securely
+    - Delete source documents after processing if not needed
+  </Accordion>
+
+  <Accordion title="Batch Processing" icon="layer-group">
+    For high-volume processing:
+
+    ```python
+    # Submit multiple documents
+    jobs = []
+    for doc_url in document_urls:
+        job = client.dastavez.extract_async(
+            document_type="auto",
+            file_url=doc_url
+        )
+        jobs.append(job)
+
+    # Collect results
+    for job in jobs:
+        result = client.dastavez.get_extraction(job.id)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Browser Agents" icon="robot" href="/api-reference/dastavez/create-agent">
+    Automate document retrieval from portals
+  </Card>
+  <Card title="Dastavez API Reference" icon="code" href="/api-reference/dastavez/overview">
+    Full API documentation
+  </Card>
+</CardGroup>

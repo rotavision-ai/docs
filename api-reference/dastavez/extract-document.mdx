@@ -1,0 +1,221 @@
+---
+title: Extract Document
+api: POST /dastavez/extract
+description: "Extract structured data from Indian documents"
+---
+
+## Request
+
+<ParamField body="document_type" type="string" required>
+  Type of document:
+  - `aadhaar` - Aadhaar card
+  - `pan` - PAN card
+  - `voter_id` - Voter ID card
+  - `passport` - Indian passport
+  - `driving_license` - Driving license
+  - `bank_statement` - Bank account statement
+  - `itr` - Income Tax Return
+  - `form_16` - Form 16
+  - `gst_invoice` - GST invoice
+  - `salary_slip` - Salary slip
+  - `auto` - Auto-detect document type
+</ParamField>
+
+<ParamField body="file" type="file">
+  Document file (multipart upload). Supports PDF, PNG, JPG, TIFF.
+</ParamField>
+
+<ParamField body="file_url" type="string">
+  URL to document file. Either `file` or `file_url` required.
+</ParamField>
+
+<ParamField body="options" type="object">
+  Extraction options.
+
+  <Expandable title="options properties">
+    <ParamField body="mask_sensitive" type="boolean" default="false">
+      Mask sensitive fields (Aadhaar number, account numbers).
+    </ParamField>
+    <ParamField body="extract_photo" type="boolean" default="false">
+      Extract photo from ID documents.
+    </ParamField>
+    <ParamField body="validate" type="boolean" default="true">
+      Validate checksums and formats.
+    </ParamField>
+    <ParamField body="language_hint" type="string">
+      Hint for document language: `hi`, `en`, `ta`, etc.
+    </ParamField>
+    <ParamField body="enhance_image" type="boolean" default="true">
+      Auto-enhance low-quality images.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="webhook_url" type="string">
+  URL for completion webhook.
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/dastavez/extract \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_type": "aadhaar",
+    "file_url": "https://storage.example.com/docs/aadhaar-123.pdf",
+    "options": {
+      "mask_sensitive": true,
+      "extract_photo": true,
+      "validate": true
+    }
+  }'
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# From URL
+result = client.dastavez.extract(
+    document_type="aadhaar",
+    file_url="https://storage.example.com/docs/aadhaar-123.pdf",
+    options={
+        "mask_sensitive": True,
+        "extract_photo": True
+    }
+)
+
+# From file
+with open("aadhaar.pdf", "rb") as f:
+    result = client.dastavez.extract(
+        document_type="aadhaar",
+        file=f,
+        options={"mask_sensitive": True}
+    )
+
+print(f"Name: {result.fields['name']}")
+print(f"Name (English): {result.fields['name_english']}")
+```
+
+```typescript Node.js
+import { Rotavision } from '@rotavision/sdk';
+import fs from 'fs';
+
+const client = new Rotavision();
+
+// From URL
+const result = await client.dastavez.extract({
+  documentType: 'aadhaar',
+  fileUrl: 'https://storage.example.com/docs/aadhaar-123.pdf',
+  options: {
+    maskSensitive: true,
+    extractPhoto: true
+  }
+});
+
+console.log(`Name: ${result.fields.name}`);
+console.log(`Name (English): ${result.fields.nameEnglish}`);
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Aadhaar
+{
+  "id": "extract_abc123",
+  "document_type": "aadhaar",
+  "status": "completed",
+  "confidence": 0.97,
+  "fields": {
+    "name": "राहुल शर्मा",
+    "name_english": "Rahul Sharma",
+    "dob": "1990-05-15",
+    "gender": "Male",
+    "aadhaar_number": "XXXX-XXXX-1234",
+    "address": {
+      "full": "123, MG Road, Koramangala, Bangalore - 560034",
+      "line1": "123, MG Road",
+      "line2": "Koramangala",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "pincode": "560034"
+    },
+    "issue_date": "2019-03-20"
+  },
+  "validation": {
+    "checksum_valid": true,
+    "format_valid": true,
+    "verhoeff_check": "pass"
+  },
+  "photo": {
+    "url": "https://storage.rotavision.com/photos/extract_abc123.jpg",
+    "expires_at": "2026-02-02T10:30:00Z"
+  },
+  "metadata": {
+    "pages": 1,
+    "file_type": "pdf",
+    "processing_time_ms": 1250
+  },
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+
+```json 200 - PAN Card
+{
+  "id": "extract_def456",
+  "document_type": "pan",
+  "status": "completed",
+  "confidence": 0.98,
+  "fields": {
+    "name": "RAHUL SHARMA",
+    "father_name": "VIJAY SHARMA",
+    "dob": "1990-05-15",
+    "pan_number": "ABCDE1234F"
+  },
+  "validation": {
+    "checksum_valid": true,
+    "format_valid": true
+  },
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+
+```json 200 - GST Invoice
+{
+  "id": "extract_ghi789",
+  "document_type": "gst_invoice",
+  "status": "completed",
+  "confidence": 0.95,
+  "fields": {
+    "invoice_number": "INV-2026-001234",
+    "invoice_date": "2026-01-15",
+    "seller": {
+      "name": "ABC Electronics Pvt Ltd",
+      "gstin": "29ABCDE1234F1Z5",
+      "address": "123 Industrial Area, Bangalore"
+    },
+    "buyer": {
+      "name": "XYZ Corporation",
+      "gstin": "27XYZAB5678C1D6",
+      "address": "456 Commercial Complex, Mumbai"
+    },
+    "items": [
+      {
+        "description": "Laptop Computer",
+        "hsn_code": "8471",
+        "quantity": 5,
+        "unit_price": 45000,
+        "total": 225000
+      }
+    ],
+    "subtotal": 225000,
+    "cgst": 20250,
+    "sgst": 20250,
+    "igst": 0,
+    "total": 265500,
+    "amount_in_words": "Two Lakh Sixty Five Thousand Five Hundred Rupees Only"
+  },
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+</ResponseExample>

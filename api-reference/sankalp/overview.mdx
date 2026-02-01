@@ -1,0 +1,104 @@
+---
+title: Sankalp Overview
+description: "Sovereign AI Gateway APIs"
+---
+
+## Introduction
+
+Sankalp provides a unified API gateway for accessing Indian and international LLMs with built-in data residency controls, cost optimization, and compliance features.
+
+<CardGroup cols={2}>
+  <Card title="Proxy Request" icon="arrow-right-arrow-left" href="/api-reference/sankalp/proxy-request">
+    Route requests to LLM providers
+  </Card>
+  <Card title="List Models" icon="list" href="/api-reference/sankalp/list-models">
+    Available models and capabilities
+  </Card>
+  <Card title="Get Usage" icon="chart-bar" href="/api-reference/sankalp/get-usage">
+    Usage analytics and costs
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Unified API
+
+Single API for 20+ LLM providers:
+
+| Category | Providers |
+|----------|-----------|
+| **International** | OpenAI, Anthropic, Google, Meta, Mistral, Cohere |
+| **Indian** | Sarvam AI, Krutrim, BharatGPT, Bhashini |
+| **Open Source** | Llama, Mixtral, Phi (self-hosted) |
+
+### Data Residency
+
+Control where your data is processed:
+
+```python
+# Force India-only processing
+response = client.sankalp.proxy(
+    model="sarvam-large",
+    messages=[...],
+    data_residency="india"  # Only use India-based providers
+)
+```
+
+### Intelligent Routing
+
+- **Cost optimization**: Route to cheapest capable model
+- **Latency optimization**: Route to fastest available
+- **Capability matching**: Auto-select model by task requirements
+- **Fallback chains**: Automatic failover if primary unavailable
+
+### Compliance
+
+- Prompt/response logging for audit
+- PII detection and redaction
+- Content filtering
+- Usage quotas and governance
+
+## Quick Example
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Simple proxy request
+response = client.sankalp.proxy(
+    model="gpt-5-mini",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Explain quantum computing in Hindi"}
+    ],
+    temperature=0.7
+)
+
+print(response.choices[0].message.content)
+print(f"Tokens: {response.usage.total_tokens}")
+print(f"Cost: ₹{response.cost.inr}")
+
+# With routing preferences
+response = client.sankalp.proxy(
+    model="auto",  # Auto-select best model
+    messages=[...],
+    routing={
+        "optimize": "cost",
+        "max_latency_ms": 2000,
+        "data_residency": "india",
+        "capabilities": ["hindi", "reasoning"]
+    }
+)
+```
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/sankalp/proxy` | Proxy request to LLM |
+| `POST` | `/sankalp/proxy/stream` | Streaming proxy request |
+| `GET` | `/sankalp/models` | List available models |
+| `GET` | `/sankalp/models/{id}` | Get model details |
+| `GET` | `/sankalp/usage` | Get usage statistics |
+| `GET` | `/sankalp/usage/costs` | Get cost breakdown |

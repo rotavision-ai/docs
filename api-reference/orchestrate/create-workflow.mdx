@@ -1,0 +1,183 @@
+---
+title: Create Workflow
+api: POST /orchestrate/workflows
+description: "Create a multi-agent workflow definition"
+---
+
+## Request
+
+<ParamField body="name" type="string" required>
+  Human-readable workflow name.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Workflow description.
+</ParamField>
+
+<ParamField body="agents" type="array" required>
+  Agent definitions.
+
+  <Expandable title="agent properties">
+    <ParamField body="id" type="string" required>
+      Unique agent identifier within workflow.
+    </ParamField>
+    <ParamField body="type" type="string" required>
+      Agent type: `llm`, `code`, `search`, `tool`, `human`.
+    </ParamField>
+    <ParamField body="model" type="string">
+      LLM model (for llm agents).
+    </ParamField>
+    <ParamField body="system_prompt" type="string">
+      System prompt (for llm agents).
+    </ParamField>
+    <ParamField body="tools" type="array">
+      Available tools (for tool agents).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="steps" type="array" required>
+  Workflow steps.
+
+  <Expandable title="step properties">
+    <ParamField body="id" type="string">
+      Step identifier. Auto-generated if not provided.
+    </ParamField>
+    <ParamField body="agent" type="string" required>
+      Agent ID to execute step.
+    </ParamField>
+    <ParamField body="action" type="string" required>
+      Action for the agent to perform.
+    </ParamField>
+    <ParamField body="input" type="string">
+      Input template (supports `{{variable}}` syntax).
+    </ParamField>
+    <ParamField body="condition" type="string">
+      Conditional expression for step execution.
+    </ParamField>
+    <ParamField body="parallel" type="array">
+      Steps to run in parallel.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="config" type="object">
+  Workflow configuration.
+
+  <Expandable title="config properties">
+    <ParamField body="timeout_ms" type="integer" default="300000">
+      Maximum execution time.
+    </ParamField>
+    <ParamField body="max_retries" type="integer" default="3">
+      Retries per step.
+    </ParamField>
+    <ParamField body="budget_usd" type="number">
+      Maximum cost budget.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/orchestrate/workflows \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Customer Support Triage",
+    "agents": [
+      {
+        "id": "classifier",
+        "type": "llm",
+        "model": "gpt-5-mini",
+        "system_prompt": "Classify customer support tickets..."
+      },
+      {
+        "id": "responder",
+        "type": "llm",
+        "model": "claude-4.5-sonnet",
+        "system_prompt": "Generate helpful customer support responses..."
+      },
+      {
+        "id": "escalation",
+        "type": "human",
+        "assignees": ["support-lead@company.com"]
+      }
+    ],
+    "steps": [
+      {
+        "agent": "classifier",
+        "action": "classify",
+        "input": "{{ticket}}"
+      },
+      {
+        "condition": "{{classifier.priority}} == \"high\"",
+        "agent": "escalation",
+        "action": "approve",
+        "input": "High priority ticket requires approval"
+      },
+      {
+        "agent": "responder",
+        "action": "respond",
+        "input": "Category: {{classifier.category}}\nTicket: {{ticket}}"
+      }
+    ]
+  }'
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+workflow = client.orchestrate.create_workflow(
+    name="Customer Support Triage",
+    agents=[
+        {
+            "id": "classifier",
+            "type": "llm",
+            "model": "gpt-5-mini",
+            "system_prompt": "Classify customer support tickets by category and priority."
+        },
+        {
+            "id": "responder",
+            "type": "llm",
+            "model": "claude-4.5-sonnet",
+            "system_prompt": "Generate helpful, empathetic customer support responses."
+        },
+        {
+            "id": "escalation",
+            "type": "human",
+            "assignees": ["support-lead@company.com"]
+        }
+    ],
+    steps=[
+        {"agent": "classifier", "action": "classify", "input": "{{ticket}}"},
+        {
+            "condition": "{{classifier.priority}} == 'high'",
+            "agent": "escalation",
+            "action": "approve",
+            "input": "High priority ticket requires approval"
+        },
+        {"agent": "responder", "action": "respond", "input": "{{ticket}}"}
+    ]
+)
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201 - Created
+{
+  "id": "wf_abc123",
+  "name": "Customer Support Triage",
+  "status": "active",
+  "version": 1,
+  "agents": [...],
+  "steps": [...],
+  "config": {
+    "timeout_ms": 300000,
+    "max_retries": 3
+  },
+  "created_at": "2026-02-01T10:00:00Z"
+}
+```
+</ResponseExample>
