@@ -1,0 +1,140 @@
+---
+title: Create Agent
+api: POST /dastavez/agents
+description: "Create a browser automation agent"
+---
+
+## Request
+
+<ParamField body="name" type="string" required>
+  Human-readable name for the agent.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Description of the agent's purpose.
+</ParamField>
+
+<ParamField body="capabilities" type="array" required>
+  Agent capabilities:
+  - `navigate` - Navigate to URLs
+  - `click` - Click elements
+  - `type` - Type text into inputs
+  - `extract` - Extract data from pages
+  - `screenshot` - Take screenshots
+  - `download` - Download files
+  - `login` - Handle authentication
+  - `captcha` - Solve simple captchas
+</ParamField>
+
+<ParamField body="credentials" type="array">
+  Stored credentials for authentication.
+
+  <Expandable title="credential properties">
+    <ParamField body="key" type="string" required>
+      Unique key to reference this credential.
+    </ParamField>
+    <ParamField body="type" type="string" required>
+      Credential type: `basic`, `form`, `oauth`.
+    </ParamField>
+    <ParamField body="username" type="string">
+      Username or email.
+    </ParamField>
+    <ParamField body="password" type="string">
+      Password (encrypted at rest).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="config" type="object">
+  Agent configuration.
+
+  <Expandable title="config properties">
+    <ParamField body="timeout_ms" type="integer" default="30000">
+      Default timeout for actions.
+    </ParamField>
+    <ParamField body="viewport" type="object">
+      Browser viewport size.
+    </ParamField>
+    <ParamField body="user_agent" type="string">
+      Custom user agent string.
+    </ParamField>
+    <ParamField body="proxy" type="string">
+      Proxy server URL.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/dastavez/agents \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "GST Portal Agent",
+    "description": "Fetches GST returns and invoices from GST portal",
+    "capabilities": ["navigate", "login", "extract", "download", "screenshot"],
+    "credentials": [
+      {
+        "key": "gst_portal",
+        "type": "form",
+        "username": "gstin@company.com",
+        "password": "encrypted_password"
+      }
+    ],
+    "config": {
+      "timeout_ms": 60000,
+      "viewport": {"width": 1920, "height": 1080}
+    }
+  }'
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+agent = client.dastavez.create_agent(
+    name="GST Portal Agent",
+    description="Fetches GST returns and invoices from GST portal",
+    capabilities=["navigate", "login", "extract", "download", "screenshot"],
+    credentials=[
+        {
+            "key": "gst_portal",
+            "type": "form",
+            "username": "gstin@company.com",
+            "password": "encrypted_password"
+        }
+    ],
+    config={
+        "timeout_ms": 60000,
+        "viewport": {"width": 1920, "height": 1080}
+    }
+)
+
+print(f"Agent ID: {agent.id}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201 - Created
+{
+  "id": "agent_xyz789",
+  "name": "GST Portal Agent",
+  "description": "Fetches GST returns and invoices from GST portal",
+  "status": "ready",
+  "capabilities": ["navigate", "login", "extract", "download", "screenshot"],
+  "credentials": [
+    {
+      "key": "gst_portal",
+      "type": "form",
+      "username": "gstin@company.com"
+    }
+  ],
+  "config": {
+    "timeout_ms": 60000,
+    "viewport": {"width": 1920, "height": 1080}
+  },
+  "created_at": "2026-02-01T10:00:00Z"
+}
+```
+</ResponseExample>

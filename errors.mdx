@@ -1,0 +1,241 @@
+---
+title: Errors
+description: "Understanding and handling Rotavision API errors"
+---
+
+## Error Response Format
+
+All API errors follow a consistent JSON structure:
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "The 'model_id' field is required",
+    "type": "validation_error",
+    "param": "model_id",
+    "request_id": "req_abc123xyz"
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `code` | Machine-readable error code |
+| `message` | Human-readable description |
+| `type` | Error category |
+| `param` | The parameter that caused the error (if applicable) |
+| `request_id` | Unique identifier for debugging |
+
+## HTTP Status Codes
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `201` | Created |
+| `400` | Bad Request - Invalid parameters |
+| `401` | Unauthorized - Invalid or missing API key |
+| `403` | Forbidden - Insufficient permissions |
+| `404` | Not Found - Resource doesn't exist |
+| `409` | Conflict - Resource already exists |
+| `422` | Unprocessable Entity - Validation failed |
+| `429` | Too Many Requests - Rate limit exceeded |
+| `500` | Internal Server Error |
+| `503` | Service Unavailable - Temporary outage |
+
+## Error Types
+
+### Authentication Errors
+
+```json
+{
+  "error": {
+    "code": "invalid_api_key",
+    "message": "The API key provided is invalid or has been revoked",
+    "type": "authentication_error"
+  }
+}
+```
+
+**Common causes:**
+- API key is malformed or incorrect
+- Key has been revoked
+- Key doesn't have required scopes
+
+### Validation Errors
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "The 'metrics' field must contain at least one valid metric",
+    "type": "validation_error",
+    "param": "metrics"
+  }
+}
+```
+
+**Common causes:**
+- Missing required fields
+- Invalid field values or types
+- Array/object constraints violated
+
+### Rate Limit Errors
+
+```json
+{
+  "error": {
+    "code": "rate_limit_exceeded",
+    "message": "Rate limit exceeded. Retry after 30 seconds.",
+    "type": "rate_limit_error"
+  }
+}
+```
+
+The response includes headers to help you handle rate limits:
+
+```
+X-RateLimit-Limit: 600
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1706780400
+Retry-After: 30
+```
+
+### Resource Errors
+
+```json
+{
+  "error": {
+    "code": "model_not_found",
+    "message": "No model found with ID 'loan-model-v3'",
+    "type": "not_found_error",
+    "param": "model_id"
+  }
+}
+```
+
+## Handling Errors in SDKs
+
+Our SDKs throw typed exceptions that you can catch and handle:
+
+<CodeGroup>
+
+```python Python
+from rotavision import Rotavision
+from rotavision.exceptions import (
+    AuthenticationError,
+    ValidationError,
+    RateLimitError,
+    NotFoundError,
+    RotavisionError
+)
+
+client = Rotavision()
+
+try:
+    result = client.vishwas.analyze(model_id="my-model", dataset=data)
+except AuthenticationError as e:
+    print(f"Check your API key: {e.message}")
+except ValidationError as e:
+    print(f"Invalid request: {e.message} (param: {e.param})")
+except RateLimitError as e:
+    print(f"Rate limited. Retry after {e.retry_after} seconds")
+except NotFoundError as e:
+    print(f"Resource not found: {e.message}")
+except RotavisionError as e:
+    print(f"API error: {e.message} (request_id: {e.request_id})")
+```
+
+```typescript Node.js
+import { Rotavision } from '@rotavision/sdk';
+import {
+  AuthenticationError,
+  ValidationError,
+  RateLimitError,
+  NotFoundError,
+  RotavisionError
+} from '@rotavision/sdk/errors';
+
+const client = new Rotavision();
+
+try {
+  const result = await client.vishwas.analyze({
+    modelId: 'my-model',
+    dataset: data
+  });
+} catch (e) {
+  if (e instanceof AuthenticationError) {
+    console.log(`Check your API key: ${e.message}`);
+  } else if (e instanceof ValidationError) {
+    console.log(`Invalid request: ${e.message} (param: ${e.param})`);
+  } else if (e instanceof RateLimitError) {
+    console.log(`Rate limited. Retry after ${e.retryAfter} seconds`);
+  } else if (e instanceof NotFoundError) {
+    console.log(`Resource not found: ${e.message}`);
+  } else if (e instanceof RotavisionError) {
+    console.log(`API error: ${e.message} (request_id: ${e.requestId})`);
+  }
+}
+```
+
+```java Java
+import com.rotavision.Rotavision;
+import com.rotavision.exceptions.*;
+
+Rotavision client = new Rotavision();
+
+try {
+    Vishwas.AnalyzeResult result = client.vishwas().analyze(request);
+} catch (AuthenticationException e) {
+    System.out.println("Check your API key: " + e.getMessage());
+} catch (ValidationException e) {
+    System.out.println("Invalid request: " + e.getMessage());
+} catch (RateLimitException e) {
+    System.out.println("Rate limited. Retry after " + e.getRetryAfter() + " seconds");
+} catch (NotFoundException e) {
+    System.out.println("Resource not found: " + e.getMessage());
+} catch (RotavisionException e) {
+    System.out.println("API error: " + e.getMessage());
+}
+```
+
+</CodeGroup>
+
+## Retry Strategy
+
+For transient errors (rate limits, 5xx errors), we recommend exponential backoff:
+
+```python Python
+import time
+from rotavision import Rotavision
+from rotavision.exceptions import RateLimitError, RotavisionError
+
+def call_with_retry(func, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except RateLimitError as e:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(e.retry_after or (2 ** attempt))
+        except RotavisionError as e:
+            if e.status_code < 500 or attempt == max_retries - 1:
+                raise
+            time.sleep(2 ** attempt)
+```
+
+<Tip>
+  Our SDKs include built-in retry logic with configurable settings. Check the SDK documentation for details.
+</Tip>
+
+## Debugging
+
+When contacting support, always include the `request_id` from the error response:
+
+```
+Request ID: req_abc123xyz
+Error: rate_limit_exceeded
+Timestamp: 2026-02-01T10:30:00Z
+```
+
+You can also find request IDs in the `X-Request-Id` response header for successful requests.

@@ -1,0 +1,228 @@
+---
+title: Python SDK
+description: "Official Python SDK for Rotavision"
+---
+
+## Installation
+
+```bash
+pip install rotavision
+```
+
+Requirements: Python 3.8+
+
+## Quick Start
+
+```python
+from rotavision import Rotavision
+
+# Initialize client
+client = Rotavision(api_key="rv_live_...")
+
+# Or use environment variable ROTAVISION_API_KEY
+client = Rotavision()
+
+# Use any product
+result = client.vishwas.analyze(model_id="my-model", dataset=data)
+```
+
+## Configuration
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision(
+    api_key="rv_live_...",
+    base_url="https://api.rotavision.com",  # Custom endpoint
+    timeout=30.0,                            # Request timeout (seconds)
+    max_retries=3,                           # Retry attempts
+    log_level="INFO"                         # Logging level
+)
+```
+
+## Products
+
+### Vishwas - Fairness & Explainability
+
+```python
+# Analyze fairness
+analysis = client.vishwas.analyze(
+    model_id="loan-model",
+    dataset={
+        "features": ["age", "income", "gender"],
+        "predictions": predictions,
+        "actuals": actuals,
+        "protected_attributes": ["gender"]
+    },
+    metrics=["demographic_parity", "equalized_odds"]
+)
+
+print(f"Score: {analysis.overall_score}")
+print(f"Bias: {analysis.bias_detected}")
+
+# Explain prediction
+explanation = client.vishwas.explain(
+    model_id="loan-model",
+    input_data={"age": 30, "income": 50000},
+    prediction=0.75,
+    method="shap"
+)
+
+print(explanation.summary)
+```
+
+### Guardian - Monitoring
+
+```python
+# Create monitor
+monitor = client.guardian.create_monitor(
+    model_id="recommendation-model",
+    name="Prod Monitor",
+    metrics=["prediction_drift", "latency_p99"],
+    alerts=[
+        {"metric": "prediction_drift", "threshold": 0.2, "severity": "critical"}
+    ]
+)
+
+# Log inference
+client.guardian.log_inference(
+    monitor_id=monitor.id,
+    input_data=features,
+    prediction=prediction,
+    latency_ms=45
+)
+
+# Batch logging (more efficient)
+client.guardian.log_inferences(
+    monitor_id=monitor.id,
+    inferences=[
+        {"input_data": f1, "prediction": p1, "latency_ms": 40},
+        {"input_data": f2, "prediction": p2, "latency_ms": 42},
+    ]
+)
+```
+
+### Dastavez - Document AI
+
+```python
+# Extract from document
+result = client.dastavez.extract(
+    document_type="aadhaar",
+    file_url="https://storage.example.com/doc.pdf"
+)
+
+print(f"Name: {result.fields['name']}")
+print(f"Confidence: {result.confidence}")
+
+# Or from file
+with open("document.pdf", "rb") as f:
+    result = client.dastavez.extract(
+        document_type="pan",
+        file=f
+    )
+```
+
+### Sankalp - LLM Gateway
+
+```python
+# Proxy to LLM
+response = client.sankalp.proxy(
+    model="gpt-5-mini",
+    messages=[
+        {"role": "user", "content": "Hello!"}
+    ]
+)
+
+print(response.choices[0].message.content)
+
+# Streaming
+for chunk in client.sankalp.proxy_stream(
+    model="claude-4.5-sonnet",
+    messages=[{"role": "user", "content": "Write a story"}]
+):
+    print(chunk.choices[0].delta.content, end="")
+```
+
+### Orchestrate - Workflows
+
+```python
+# Run workflow
+execution = client.orchestrate.run_workflow(
+    workflow_id="wf_abc123",
+    inputs={"query": "Research AI in India"}
+)
+
+# Wait for completion
+result = client.orchestrate.wait_for_execution(execution.id)
+print(result.outputs)
+```
+
+### Gati - Fleet Intelligence
+
+```python
+# Optimize routes
+result = client.gati.optimize_routes(
+    vehicles=[{"id": "v1", "capacity": 100, "start_location": {...}}],
+    orders=[{"id": "o1", "location": {...}, "demand": 10}]
+)
+
+for route in result.routes:
+    print(f"Vehicle {route.vehicle_id}: {len(route.stops)} stops")
+```
+
+## Async Support
+
+```python
+import asyncio
+from rotavision import AsyncRotavision
+
+async def main():
+    client = AsyncRotavision()
+
+    # Async API calls
+    result = await client.vishwas.analyze(...)
+
+    # Concurrent requests
+    analyses = await asyncio.gather(
+        client.vishwas.analyze(model_id="model1", ...),
+        client.vishwas.analyze(model_id="model2", ...),
+    )
+
+asyncio.run(main())
+```
+
+## Error Handling
+
+```python
+from rotavision.exceptions import (
+    RotavisionError,
+    AuthenticationError,
+    ValidationError,
+    RateLimitError,
+    NotFoundError
+)
+
+try:
+    result = client.vishwas.analyze(...)
+except AuthenticationError:
+    print("Invalid API key")
+except ValidationError as e:
+    print(f"Invalid request: {e.param}")
+except RateLimitError as e:
+    print(f"Rate limited, retry after {e.retry_after}s")
+except RotavisionError as e:
+    print(f"API error: {e.message}")
+```
+
+## Logging
+
+```python
+import logging
+
+# Enable debug logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Or configure specific logger
+logger = logging.getLogger("rotavision")
+logger.setLevel(logging.DEBUG)
+```

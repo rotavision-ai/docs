@@ -1,0 +1,116 @@
+---
+title: List Models
+api: GET /sankalp/models
+description: "List available LLM models"
+---
+
+## Request
+
+<ParamField query="provider" type="string">
+  Filter by provider: `openai`, `anthropic`, `sarvam`, `krutrim`, etc.
+</ParamField>
+
+<ParamField query="capability" type="string">
+  Filter by capability: `chat`, `code`, `vision`, `hindi`, `tamil`, etc.
+</ParamField>
+
+<ParamField query="data_residency" type="string">
+  Filter by data residency: `india`, `asia`, `us`, `eu`.
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl "https://api.rotavision.com/v1/sankalp/models?data_residency=india" \
+  -H "Authorization: Bearer rv_live_..."
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+models = client.sankalp.list_models(data_residency="india")
+
+for model in models.data:
+    print(f"{model.id}: {model.description}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "data": [
+    {
+      "id": "sarvam-large",
+      "provider": "sarvam",
+      "description": "Sarvam AI's flagship model with strong Indic language support",
+      "capabilities": ["chat", "hindi", "tamil", "telugu", "bengali", "reasoning"],
+      "context_window": 32000,
+      "data_residency": "india",
+      "pricing": {
+        "input_per_1k": 0.0005,
+        "output_per_1k": 0.0015,
+        "currency": "usd"
+      },
+      "status": "available"
+    },
+    {
+      "id": "sarvam-small",
+      "provider": "sarvam",
+      "description": "Efficient model for simple tasks",
+      "capabilities": ["chat", "hindi", "english"],
+      "context_window": 8000,
+      "data_residency": "india",
+      "pricing": {
+        "input_per_1k": 0.0001,
+        "output_per_1k": 0.0003,
+        "currency": "usd"
+      },
+      "status": "available"
+    },
+    {
+      "id": "krutrim-3",
+      "provider": "krutrim",
+      "description": "Ola's Krutrim model with Indian language focus",
+      "capabilities": ["chat", "hindi", "kannada", "code"],
+      "context_window": 16000,
+      "data_residency": "india",
+      "pricing": {
+        "input_per_1k": 0.0004,
+        "output_per_1k": 0.0012,
+        "currency": "usd"
+      },
+      "status": "available"
+    },
+    {
+      "id": "gpt-5-mini",
+      "provider": "openai",
+      "description": "OpenAI's efficient GPT-5 variant",
+      "capabilities": ["chat", "code", "reasoning", "vision"],
+      "context_window": 128000,
+      "data_residency": "us",
+      "pricing": {
+        "input_per_1k": 0.003,
+        "output_per_1k": 0.006,
+        "currency": "usd"
+      },
+      "status": "available"
+    },
+    {
+      "id": "claude-4.5-sonnet",
+      "provider": "anthropic",
+      "description": "Anthropic's balanced Claude model",
+      "capabilities": ["chat", "code", "reasoning", "vision"],
+      "context_window": 200000,
+      "data_residency": "us",
+      "pricing": {
+        "input_per_1k": 0.003,
+        "output_per_1k": 0.015,
+        "currency": "usd"
+      },
+      "status": "available"
+    }
+  ]
+}
+```
+</ResponseExample>

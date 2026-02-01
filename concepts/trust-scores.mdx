@@ -1,0 +1,172 @@
+---
+title: Trust Scores
+description: "Understanding Rotavision's AI trust measurement framework"
+---
+
+## Overview
+
+Rotavision's trust scoring system provides a unified framework for measuring AI system trustworthiness across multiple dimensions. Each dimension is scored from 0-100, with higher scores indicating greater trustworthiness.
+
+## Trust Dimensions
+
+<CardGroup cols={2}>
+  <Card title="Fairness" icon="scale-balanced">
+    Measures equitable treatment across protected groups
+  </Card>
+  <Card title="Reliability" icon="shield-check">
+    Measures consistency and stability of predictions
+  </Card>
+  <Card title="Explainability" icon="lightbulb">
+    Measures how well predictions can be understood
+  </Card>
+  <Card title="Privacy" icon="lock">
+    Measures data protection and privacy preservation
+  </Card>
+</CardGroup>
+
+## Overall Trust Score
+
+The overall trust score is a weighted combination of individual dimensions:
+
+```
+Trust Score = Σ (dimension_score × dimension_weight)
+```
+
+Default weights are:
+- Fairness: 30%
+- Reliability: 30%
+- Explainability: 25%
+- Privacy: 15%
+
+<Info>
+  Weights can be customized based on your industry and regulatory requirements. Financial services often increase fairness weight, while healthcare may prioritize explainability.
+</Info>
+
+## Fairness Metrics
+
+Vishwas calculates fairness using industry-standard metrics:
+
+| Metric | Description | Threshold |
+|--------|-------------|-----------|
+| **Demographic Parity** | Equal positive prediction rates across groups | ≥ 0.80 |
+| **Equalized Odds** | Equal TPR and FPR across groups | ≥ 0.80 |
+| **Calibration** | Predicted probabilities match actual outcomes | ≥ 0.80 |
+| **Individual Fairness** | Similar individuals receive similar predictions | ≥ 0.75 |
+| **Counterfactual Fairness** | Predictions unchanged if protected attributes changed | ≥ 0.80 |
+
+### Calculating Demographic Parity
+
+```python
+# Demographic parity ratio
+dp_ratio = P(Ŷ=1 | A=minority) / P(Ŷ=1 | A=majority)
+
+# Score (0-100)
+fairness_score = min(dp_ratio, 1/dp_ratio) * 100
+```
+
+### Multi-Group Fairness
+
+For attributes with multiple groups (e.g., states, languages), Rotavision calculates:
+
+1. **Pairwise ratios** between all group pairs
+2. **Minimum ratio** as the fairness bound
+3. **Weighted average** based on group sizes
+
+## Reliability Metrics
+
+Guardian monitors reliability through:
+
+| Metric | Description | Alert Threshold |
+|--------|-------------|-----------------|
+| **Prediction Drift** | KL divergence of output distribution | > 0.1 |
+| **Feature Drift** | PSI of input features | > 0.2 |
+| **Accuracy Decay** | Drop in monitored accuracy metric | > 5% |
+| **Latency P99** | 99th percentile response time | > SLA |
+| **Error Rate** | Percentage of failed predictions | > 1% |
+
+### Drift Detection
+
+```python
+# Population Stability Index (PSI)
+psi = Σ (actual_% - expected_%) × ln(actual_% / expected_%)
+
+# Interpretation
+# PSI < 0.1  → No significant drift
+# PSI 0.1-0.2 → Moderate drift (monitor)
+# PSI > 0.2  → Significant drift (investigate)
+```
+
+## Explainability Scores
+
+Measured through explanation quality metrics:
+
+| Metric | Description |
+|--------|-------------|
+| **Faithfulness** | How accurately explanations reflect model behavior |
+| **Stability** | Consistency of explanations for similar inputs |
+| **Comprehensibility** | Human-understandable explanation complexity |
+| **Completeness** | Coverage of important features in explanations |
+
+## Score Interpretation
+
+<AccordionGroup>
+  <Accordion title="90-100: Excellent" icon="circle-check">
+    Model meets highest trust standards. Suitable for high-stakes decisions with minimal additional oversight.
+  </Accordion>
+
+  <Accordion title="75-89: Good" icon="circle-half-stroke">
+    Model is generally trustworthy. Consider targeted improvements for specific dimensions below threshold.
+  </Accordion>
+
+  <Accordion title="60-74: Needs Improvement" icon="circle-exclamation">
+    Significant trust gaps exist. Recommend human oversight and remediation plan before production use.
+  </Accordion>
+
+  <Accordion title="Below 60: Critical" icon="circle-xmark">
+    Model does not meet minimum trust requirements. Do not deploy without major improvements.
+  </Accordion>
+</AccordionGroup>
+
+## Industry Benchmarks
+
+Based on our analysis of enterprise AI deployments in India:
+
+| Industry | Average Trust Score | Top Quartile |
+|----------|--------------------:|-------------:|
+| Banking & Finance | 72 | 85+ |
+| Insurance | 68 | 82+ |
+| Healthcare | 65 | 80+ |
+| E-commerce | 70 | 83+ |
+| Telecom | 74 | 86+ |
+
+## Regulatory Alignment
+
+Rotavision trust scores map to regulatory requirements:
+
+| Regulation | Relevant Dimensions |
+|------------|---------------------|
+| RBI AI Guidelines | Fairness, Explainability |
+| DPDP Act 2023 | Privacy, Transparency |
+| SEBI ML Circular | Reliability, Auditability |
+| IRDAI AI Guidelines | Fairness, Explainability |
+
+<Tip>
+  Generate compliance-ready reports with `vishwas.generate_report()` that map your scores to specific regulatory requirements.
+</Tip>
+
+## Improving Trust Scores
+
+<Steps>
+  <Step title="Identify Gaps">
+    Review dimension-level scores to find areas below threshold
+  </Step>
+  <Step title="Analyze Root Causes">
+    Use Vishwas explanations to understand why specific metrics are low
+  </Step>
+  <Step title="Implement Mitigations">
+    Apply recommended techniques (resampling, threshold adjustment, etc.)
+  </Step>
+  <Step title="Monitor Continuously">
+    Set up Guardian alerts to catch score degradation early
+  </Step>
+</Steps>

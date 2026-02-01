@@ -1,0 +1,76 @@
+---
+title: LlamaIndex Integration
+description: "Add Rotavision trust & monitoring to LlamaIndex apps"
+---
+
+## Overview
+
+Integrate Rotavision with LlamaIndex for monitoring and fairness analysis of your RAG applications.
+
+## Installation
+
+```bash
+pip install rotavision llama-index
+```
+
+## Sankalp as LlamaIndex LLM
+
+```python
+from llama_index.llms import CustomLLM
+from rotavision.integrations.llamaindex import SankalpLLM
+
+# Use Sankalp as your LLM
+llm = SankalpLLM(
+    api_key="rv_live_...",
+    model="claude-4.5-sonnet",
+    routing={"data_residency": "india"}
+)
+
+# Create index with Sankalp
+from llama_index import VectorStoreIndex, SimpleDirectoryReader
+
+documents = SimpleDirectoryReader("data").load_data()
+index = VectorStoreIndex.from_documents(documents, llm=llm)
+```
+
+## Query Engine Monitoring
+
+Monitor your query engine:
+
+```python
+from rotavision.integrations.llamaindex import GuardianCallback
+
+callback = GuardianCallback(
+    api_key="rv_live_...",
+    monitor_id="mon_abc123"
+)
+
+query_engine = index.as_query_engine(
+    callbacks=[callback]
+)
+
+# Queries are logged to Guardian
+response = query_engine.query("What are the key findings?")
+```
+
+## Retrieval Fairness
+
+Analyze retrieval fairness:
+
+```python
+from rotavision.integrations.llamaindex import FairnessAnalyzer
+
+analyzer = FairnessAnalyzer(api_key="rv_live_...")
+
+# Analyze retrieval results
+analysis = analyzer.analyze_retrieval(
+    query_engine=query_engine,
+    test_queries=[
+        {"query": "Loan options for urban customers", "metadata": {"region": "urban"}},
+        {"query": "Loan options for rural customers", "metadata": {"region": "rural"}},
+    ],
+    protected_attribute="region"
+)
+
+print(f"Retrieval fairness score: {analysis.score}")
+```

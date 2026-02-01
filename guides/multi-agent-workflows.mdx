@@ -1,0 +1,340 @@
+---
+title: Multi-Agent Workflows Guide
+description: "Build complex AI workflows with Orchestrate"
+---
+
+## Overview
+
+Orchestrate enables building sophisticated AI workflows that coordinate multiple specialized agents. This guide covers workflow design patterns and best practices.
+
+## Core Concepts
+
+### Agents
+
+Agents are specialized workers that perform specific tasks:
+
+| Type | Use Case |
+|------|----------|
+| **LLM Agent** | Natural language reasoning, generation |
+| **Code Agent** | Execute Python/JavaScript |
+| **Search Agent** | Web, document, or database search |
+| **Tool Agent** | Call external APIs |
+| **Human Agent** | Human-in-the-loop approval |
+
+### Workflows
+
+Workflows define how agents collaborate:
+
+```python
+workflow = {
+    "agents": [...],  # Agent definitions
+    "steps": [...],   # Execution sequence
+    "config": {...}   # Settings
+}
+```
+
+## Building Your First Workflow
+
+### Research Assistant Example
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+workflow = client.orchestrate.create_workflow(
+    name="Research Assistant",
+    agents=[
+        {
+            "id": "planner",
+            "type": "llm",
+            "model": "gpt-5-mini",
+            "system_prompt": """You are a research planner. Given a topic,
+            output a JSON list of 3-5 specific search queries to research it thoroughly."""
+        },
+        {
+            "id": "searcher",
+            "type": "search",
+            "sources": ["web", "news", "academic"]
+        },
+        {
+            "id": "synthesizer",
+            "type": "llm",
+            "model": "claude-4.5-sonnet",
+            "system_prompt": """You are a research synthesizer. Given search results,
+            create a comprehensive summary with citations."""
+        }
+    ],
+    steps=[
+        {
+            "id": "plan",
+            "agent": "planner",
+            "action": "generate",
+            "input": "Research topic: {{topic}}"
+        },
+        {
+            "id": "search",
+            "agent": "searcher",
+            "action": "search",
+            "input": "{{plan.queries}}"
+        },
+        {
+            "id": "synthesize",
+            "agent": "synthesizer",
+            "action": "generate",
+            "input": "Topic: {{topic}}\n\nSearch Results:\n{{search.results}}"
+        }
+    ]
+)
+
+# Run the workflow
+execution = client.orchestrate.run_workflow(
+    workflow_id=workflow.id,
+    inputs={"topic": "Electric vehicle adoption in India 2026"}
+)
+
+# Wait for completion
+result = client.orchestrate.wait_for_execution(execution.id)
+print(result.outputs["synthesize"])
+```
+
+## Workflow Patterns
+
+### Sequential Processing
+
+Steps execute one after another:
+
+```python
+steps = [
+    {"agent": "classifier", "action": "classify", "input": "{{text}}"},
+    {"agent": "processor", "action": "process", "input": "{{classifier.output}}"},
+    {"agent": "formatter", "action": "format", "input": "{{processor.output}}"}
+]
+```
+
+### Parallel Processing
+
+Steps execute simultaneously:
+
+```python
+steps = [
+    {
+        "parallel": [
+            {"agent": "web_search", "action": "search", "input": "{{query}}"},
+            {"agent": "news_search", "action": "search", "input": "{{query}}"},
+            {"agent": "academic_search", "action": "search", "input": "{{query}}"}
+        ]
+    },
+    {
+        "agent": "aggregator",
+        "action": "aggregate",
+        "input": "{{web_search.results}}\n{{news_search.results}}\n{{academic_search.results}}"
+    }
+]
+```
+
+### Conditional Execution
+
+Branch based on results:
+
+```python
+steps = [
+    {"agent": "classifier", "action": "classify", "input": "{{ticket}}"},
+    {
+        "condition": "{{classifier.priority}} == 'high'",
+        "then": [
+            {"agent": "escalation", "action": "notify", "input": "High priority: {{ticket}}"}
+        ],
+        "else": [
+            {"agent": "auto_responder", "action": "respond", "input": "{{ticket}}"}
+        ]
+    }
+]
+```
+
+### Loop/Iteration
+
+Process items iteratively:
+
+```python
+steps = [
+    {"agent": "splitter", "action": "split", "input": "{{document}}"},
+    {
+        "loop": {
+            "items": "{{splitter.chunks}}",
+            "as": "chunk",
+            "steps": [
+                {"agent": "processor", "action": "process", "input": "{{chunk}}"}
+            ]
+        }
+    },
+    {"agent": "combiner", "action": "combine", "input": "{{loop.results}}"}
+]
+```
+
+## Human-in-the-Loop
+
+Add approval gates for sensitive operations:
+
+```python
+workflow = client.orchestrate.create_workflow(
+    name="Content Moderation",
+    agents=[
+        {
+            "id": "moderator",
+            "type": "llm",
+            "model": "gpt-5-mini",
+            "system_prompt": "Analyze content for policy violations..."
+        },
+        {
+            "id": "human_review",
+            "type": "human",
+            "assignees": ["moderation-team@company.com"],
+            "timeout_hours": 24
+        },
+        {
+            "id": "action_taker",
+            "type": "tool",
+            "tools": ["content_api"]
+        }
+    ],
+    steps=[
+        {"agent": "moderator", "action": "analyze", "input": "{{content}}"},
+        {
+            "condition": "{{moderator.requires_human_review}}",
+            "then": [
+                {
+                    "agent": "human_review",
+                    "action": "approve",
+                    "input": "Review needed for: {{content}}\nAI Assessment: {{moderator.assessment}}"
+                }
+            ]
+        },
+        {
+            "condition": "{{human_review.approved}} or not {{moderator.requires_human_review}}",
+            "then": [
+                {"agent": "action_taker", "action": "publish", "input": "{{content}}"}
+            ],
+            "else": [
+                {"agent": "action_taker", "action": "reject", "input": "{{content}}"}
+            ]
+        }
+    ]
+)
+```
+
+## Error Handling
+
+### Retry Configuration
+
+```python
+workflow = client.orchestrate.create_workflow(
+    name="Robust Workflow",
+    config={
+        "max_retries": 3,
+        "retry_delay_ms": 1000,
+        "on_error": "retry"  # or "stop", "continue"
+    },
+    steps=[...]
+)
+```
+
+### Per-Step Error Handling
+
+```python
+steps = [
+    {
+        "agent": "api_caller",
+        "action": "call",
+        "input": "{{data}}",
+        "on_error": {
+            "retry": 3,
+            "fallback": {
+                "agent": "fallback_handler",
+                "action": "handle",
+                "input": "Error: {{error}}"
+            }
+        }
+    }
+]
+```
+
+## Cost Controls
+
+### Budget Limits
+
+```python
+workflow = client.orchestrate.create_workflow(
+    name="Controlled Workflow",
+    config={
+        "budget_usd": 1.00,  # Max $1 per execution
+        "on_budget_exceeded": "stop"
+    },
+    steps=[...]
+)
+```
+
+### Token Limits
+
+```python
+agents = [
+    {
+        "id": "writer",
+        "type": "llm",
+        "model": "claude-4.5-sonnet",
+        "max_tokens": 2000  # Limit per call
+    }
+]
+```
+
+## Monitoring Executions
+
+```python
+# Get execution status
+execution = client.orchestrate.get_execution("exec_xyz789")
+
+print(f"Status: {execution.status}")
+print(f"Current step: {execution.current_step}")
+print(f"Progress: {execution.progress.completed}/{execution.progress.total}")
+
+# View step-by-step results
+for step in execution.steps:
+    print(f"\n{step.id}: {step.status}")
+    if step.output:
+        print(f"  Output: {step.output[:200]}...")
+    if step.error:
+        print(f"  Error: {step.error}")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep agents focused" icon="bullseye">
+    Each agent should do one thing well. Instead of one mega-agent, use multiple specialized agents.
+  </Accordion>
+
+  <Accordion title="Use appropriate models" icon="brain">
+    - Fast/cheap models (GPT-5-mini) for classification, routing
+    - Powerful models (Claude 4.5 Sonnet) for synthesis, writing
+    - Code agents for deterministic operations
+  </Accordion>
+
+  <Accordion title="Add human gates for critical decisions" icon="user">
+    For anything that could cause harm or significant business impact, add human approval.
+  </Accordion>
+
+  <Accordion title="Set cost budgets" icon="wallet">
+    Always set budget limits to prevent runaway costs from infinite loops or unexpected usage.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Orchestrate API Reference" icon="code" href="/api-reference/orchestrate/overview">
+    Full API documentation
+  </Card>
+  <Card title="Sankalp LLM Gateway" icon="server" href="/api-reference/sankalp/overview">
+    Route LLM requests efficiently
+  </Card>
+</CardGroup>

@@ -1,0 +1,169 @@
+---
+title: API Overview
+description: "Introduction to the Rotavision REST API"
+---
+
+## Base URL
+
+All API requests should be made to:
+
+```
+https://api.rotavision.com/v1
+```
+
+## Authentication
+
+Include your API key in the `Authorization` header:
+
+```bash
+curl https://api.rotavision.com/v1/vishwas/analyze \
+  -H "Authorization: Bearer rv_live_your_api_key" \
+  -H "Content-Type: application/json"
+```
+
+See [Authentication](/authentication) for details on API key types and scopes.
+
+## Request Format
+
+All request bodies should be JSON with `Content-Type: application/json`:
+
+```bash
+curl -X POST https://api.rotavision.com/v1/vishwas/analyze \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_id": "loan-approval-v2",
+    "dataset": { ... }
+  }'
+```
+
+## Response Format
+
+All responses are JSON. Successful responses include the requested data:
+
+```json
+{
+  "id": "analysis_abc123",
+  "model_id": "loan-approval-v2",
+  "status": "completed",
+  "overall_score": 0.82,
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+
+Error responses follow a consistent structure:
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "The 'model_id' field is required",
+    "type": "validation_error",
+    "param": "model_id",
+    "request_id": "req_abc123"
+  }
+}
+```
+
+## Pagination
+
+List endpoints support cursor-based pagination:
+
+```bash
+curl "https://api.rotavision.com/v1/vishwas/analyses?limit=20&cursor=abc123" \
+  -H "Authorization: Bearer rv_live_..."
+```
+
+Response includes pagination metadata:
+
+```json
+{
+  "data": [...],
+  "has_more": true,
+  "next_cursor": "xyz789"
+}
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `limit` | Number of items per page (default: 20, max: 100) |
+| `cursor` | Cursor for the next page |
+
+## Filtering & Sorting
+
+List endpoints support filtering and sorting:
+
+```bash
+# Filter by status and sort by creation date
+curl "https://api.rotavision.com/v1/guardian/alerts?status=active&sort=-created_at" \
+  -H "Authorization: Bearer rv_live_..."
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `sort` | Field to sort by. Prefix with `-` for descending |
+| `created_after` | Filter by creation date (ISO 8601) |
+| `created_before` | Filter by creation date (ISO 8601) |
+
+## Idempotency
+
+For POST requests, include an `Idempotency-Key` header to safely retry requests:
+
+```bash
+curl -X POST https://api.rotavision.com/v1/vishwas/analyze \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Idempotency-Key: unique-request-id-123" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+Requests with the same idempotency key within 24 hours return the cached response.
+
+## Versioning
+
+The API version is included in the URL path (`/v1`). We follow semantic versioning:
+
+- **Patch versions** (v1.0.x): Bug fixes, no breaking changes
+- **Minor versions** (v1.x.0): New features, backward compatible
+- **Major versions** (vX.0.0): Breaking changes
+
+We provide at least 12 months notice before deprecating major versions.
+
+## SDKs
+
+Official SDKs handle authentication, retries, and error handling:
+
+<CardGroup cols={3}>
+  <Card title="Python" icon="python" href="/sdks/python">
+    `pip install rotavision`
+  </Card>
+  <Card title="Node.js" icon="node-js" href="/sdks/nodejs">
+    `npm install @rotavision/sdk`
+  </Card>
+  <Card title="Java" icon="java" href="/sdks/java">
+    Maven Central
+  </Card>
+</CardGroup>
+
+## Products
+
+<CardGroup cols={2}>
+  <Card title="Vishwas" icon="scale-balanced" href="/api-reference/vishwas/overview">
+    Trust, Fairness & Explainability APIs
+  </Card>
+  <Card title="Guardian" icon="shield-check" href="/api-reference/guardian/overview">
+    AI Reliability Monitoring APIs
+  </Card>
+  <Card title="Dastavez" icon="file-lines" href="/api-reference/dastavez/overview">
+    Document AI & Browser Agent APIs
+  </Card>
+  <Card title="Sankalp" icon="server" href="/api-reference/sankalp/overview">
+    Sovereign AI Gateway APIs
+  </Card>
+  <Card title="Orchestrate" icon="diagram-project" href="/api-reference/orchestrate/overview">
+    Multi-Agent Workflow APIs
+  </Card>
+  <Card title="Gati" icon="truck-fast" href="/api-reference/gati/overview">
+    Fleet & Mobility Intelligence APIs
+  </Card>
+</CardGroup>

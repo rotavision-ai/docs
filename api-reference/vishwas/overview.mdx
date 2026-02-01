@@ -1,0 +1,95 @@
+---
+title: Vishwas Overview
+description: "Trust, Fairness & Explainability APIs"
+---
+
+## Introduction
+
+Vishwas provides APIs to measure and monitor fairness in AI systems, generate human-readable explanations, and create compliance-ready audit reports.
+
+<CardGroup cols={2}>
+  <Card title="Analyze Fairness" icon="magnifying-glass-chart" href="/api-reference/vishwas/analyze-fairness">
+    Measure bias across protected attributes
+  </Card>
+  <Card title="Explain Predictions" icon="lightbulb" href="/api-reference/vishwas/explain-prediction">
+    Generate interpretable explanations
+  </Card>
+  <Card title="Generate Reports" icon="file-pdf" href="/api-reference/vishwas/generate-report">
+    Create audit-ready compliance reports
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Fairness Metrics
+
+Vishwas supports 15+ industry-standard fairness metrics:
+
+| Category | Metrics |
+|----------|---------|
+| **Group Fairness** | Demographic Parity, Equalized Odds, Equal Opportunity |
+| **Calibration** | Calibration, Sufficiency, Balance |
+| **Individual** | Individual Fairness, Counterfactual Fairness |
+| **Causal** | Causal Discrimination, Path-Specific Effects |
+
+### Explanation Methods
+
+| Method | Best For |
+|--------|----------|
+| **SHAP** | Feature importance with game-theoretic foundation |
+| **LIME** | Local interpretable explanations |
+| **Anchors** | Rule-based explanations |
+| **Counterfactuals** | "What-if" scenarios |
+| **Prototypes** | Similar examples from training data |
+
+### Indian Context
+
+Vishwas includes India-specific enhancements:
+
+- **Protected attributes**: Caste, religion, regional origin
+- **Language support**: Explanations in 12 Indian languages
+- **Regulatory mapping**: RBI, SEBI, IRDAI guidelines
+
+## Quick Example
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Analyze fairness
+analysis = client.vishwas.analyze(
+    model_id="loan-approval-v2",
+    dataset={
+        "features": features,
+        "predictions": predictions,
+        "actuals": actuals,
+        "protected_attributes": ["gender", "region"]
+    },
+    metrics=["demographic_parity", "equalized_odds"]
+)
+
+print(f"Overall Score: {analysis.overall_score}")
+print(f"Bias Detected: {analysis.bias_detected}")
+
+# Explain a prediction
+explanation = client.vishwas.explain(
+    model_id="loan-approval-v2",
+    input_data=applicant_features,
+    prediction=0.73,
+    method="shap"
+)
+
+print(f"Top factors: {explanation.top_features}")
+```
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/vishwas/analyze` | Run fairness analysis |
+| `GET` | `/vishwas/analyses/{id}` | Get analysis results |
+| `GET` | `/vishwas/analyses` | List analyses |
+| `POST` | `/vishwas/explain` | Explain a prediction |
+| `POST` | `/vishwas/reports` | Generate compliance report |
+| `GET` | `/vishwas/reports/{id}` | Get report status/download |

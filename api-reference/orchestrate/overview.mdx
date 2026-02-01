@@ -1,0 +1,110 @@
+---
+title: Orchestrate Overview
+description: "Multi-Agent Workflow APIs"
+---
+
+## Introduction
+
+Orchestrate enables building and deploying multi-agent AI workflows for complex enterprise tasks. Coordinate specialized agents, manage state, and implement human-in-the-loop controls.
+
+<CardGroup cols={2}>
+  <Card title="Create Workflow" icon="plus" href="/api-reference/orchestrate/create-workflow">
+    Define multi-agent workflows
+  </Card>
+  <Card title="Run Workflow" icon="play" href="/api-reference/orchestrate/run-workflow">
+    Execute workflows
+  </Card>
+  <Card title="Get Execution" icon="eye" href="/api-reference/orchestrate/get-execution">
+    Monitor workflow progress
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Agent Types
+
+| Agent | Capability |
+|-------|------------|
+| **LLM Agent** | Natural language reasoning and generation |
+| **Code Agent** | Execute Python/JavaScript code |
+| **Search Agent** | Web and document search |
+| **Tool Agent** | Call external APIs and tools |
+| **Human Agent** | Human-in-the-loop approval/input |
+
+### Workflow Patterns
+
+- **Sequential**: Agents run in order
+- **Parallel**: Multiple agents run simultaneously
+- **Conditional**: Branch based on results
+- **Loop**: Iterate until condition met
+- **Map-Reduce**: Process items in parallel, aggregate results
+
+### Enterprise Features
+
+- State persistence across executions
+- Retry and error handling
+- Audit logging
+- Cost controls and budgets
+- Human approval gates
+
+## Quick Example
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Create a research workflow
+workflow = client.orchestrate.create_workflow(
+    name="Market Research Pipeline",
+    agents=[
+        {
+            "id": "researcher",
+            "type": "llm",
+            "model": "gpt-5-mini",
+            "system_prompt": "You are a market research analyst..."
+        },
+        {
+            "id": "searcher",
+            "type": "search",
+            "sources": ["web", "news", "academic"]
+        },
+        {
+            "id": "writer",
+            "type": "llm",
+            "model": "claude-4.5-sonnet",
+            "system_prompt": "You are a report writer..."
+        }
+    ],
+    steps=[
+        {"agent": "researcher", "action": "plan_research", "input": "{{topic}}"},
+        {"agent": "searcher", "action": "search", "input": "{{researcher.queries}}"},
+        {"agent": "writer", "action": "write_report", "input": "{{searcher.results}}"}
+    ]
+)
+
+# Run the workflow
+execution = client.orchestrate.run_workflow(
+    workflow_id=workflow.id,
+    inputs={"topic": "Electric vehicle adoption in India 2026"}
+)
+
+# Get results
+result = client.orchestrate.get_execution(execution.id)
+print(result.outputs["report"])
+```
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/orchestrate/workflows` | Create workflow |
+| `GET` | `/orchestrate/workflows/{id}` | Get workflow |
+| `GET` | `/orchestrate/workflows` | List workflows |
+| `PATCH` | `/orchestrate/workflows/{id}` | Update workflow |
+| `DELETE` | `/orchestrate/workflows/{id}` | Delete workflow |
+| `POST` | `/orchestrate/workflows/{id}/run` | Run workflow |
+| `GET` | `/orchestrate/executions/{id}` | Get execution |
+| `GET` | `/orchestrate/executions` | List executions |
+| `POST` | `/orchestrate/executions/{id}/cancel` | Cancel execution |
+| `POST` | `/orchestrate/executions/{id}/approve` | Approve human step |

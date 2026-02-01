@@ -1,0 +1,132 @@
+---
+title: Predict Demand
+api: POST /gati/demand/predict
+description: "Forecast demand by location and time"
+---
+
+## Request
+
+<ParamField body="regions" type="array" required>
+  Regions to predict demand for.
+
+  <Expandable title="region properties">
+    <ParamField body="id" type="string" required>
+      Region identifier.
+    </ParamField>
+    <ParamField body="bounds" type="object">
+      Geographic bounds (north, south, east, west).
+    </ParamField>
+    <ParamField body="center" type="object">
+      Center point with radius_km.
+    </ParamField>
+    <ParamField body="pincode" type="string">
+      Indian pincode.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="period" type="object" required>
+  Prediction period.
+
+  <Expandable title="period properties">
+    <ParamField body="start" type="string" required>
+      Start date/time (ISO 8601).
+    </ParamField>
+    <ParamField body="end" type="string" required>
+      End date/time (ISO 8601).
+    </ParamField>
+    <ParamField body="granularity" type="string" default="hour">
+      Time granularity: `hour`, `day`, `week`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="factors" type="object">
+  Additional factors to consider.
+
+  <Expandable title="factors properties">
+    <ParamField body="weather" type="boolean" default="true">
+      Include weather impact.
+    </ParamField>
+    <ParamField body="events" type="boolean" default="true">
+      Include local events.
+    </ParamField>
+    <ParamField body="holidays" type="boolean" default="true">
+      Include holiday patterns.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<RequestExample>
+```python Python
+forecast = client.gati.predict_demand(
+    regions=[
+        {"id": "koramangala", "pincode": "560034"},
+        {"id": "indiranagar", "pincode": "560038"},
+        {"id": "whitefield", "pincode": "560066"}
+    ],
+    period={
+        "start": "2026-02-01",
+        "end": "2026-02-07",
+        "granularity": "hour"
+    },
+    factors={
+        "weather": True,
+        "events": True,
+        "holidays": True
+    }
+)
+
+for region in forecast.predictions:
+    print(f"{region.id}: Peak demand at {region.peak_hour} ({region.peak_demand} orders)")
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "id": "forecast_xyz789",
+  "period": {
+    "start": "2026-02-01T00:00:00Z",
+    "end": "2026-02-07T23:59:59Z"
+  },
+  "predictions": [
+    {
+      "region_id": "koramangala",
+      "total_demand": 4250,
+      "daily_average": 607,
+      "peak_day": "2026-02-02",
+      "peak_hour": "19:00",
+      "peak_demand": 85,
+      "hourly": [
+        {"hour": "2026-02-01T00:00:00Z", "demand": 12, "confidence": 0.85},
+        {"hour": "2026-02-01T01:00:00Z", "demand": 8, "confidence": 0.82}
+      ],
+      "factors": {
+        "weekend_boost": 1.15,
+        "weather_impact": 0.95,
+        "event_impact": 1.0
+      }
+    },
+    {
+      "region_id": "indiranagar",
+      "total_demand": 3890,
+      "daily_average": 556,
+      "peak_day": "2026-02-02",
+      "peak_hour": "20:00",
+      "peak_demand": 78
+    },
+    {
+      "region_id": "whitefield",
+      "total_demand": 2150,
+      "daily_average": 307,
+      "peak_day": "2026-02-01",
+      "peak_hour": "18:00",
+      "peak_demand": 52,
+      "notes": ["IPL match on Feb 2 may increase demand by 25%"]
+    }
+  ],
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+</ResponseExample>

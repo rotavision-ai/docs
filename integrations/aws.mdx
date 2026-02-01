@@ -1,0 +1,212 @@
+---
+title: AWS Integration
+description: "Integrate Rotavision with AWS services"
+---
+
+## Overview
+
+Rotavision integrates with AWS for data access, model monitoring, and LLM routing.
+
+## S3 Integration
+
+### Direct Access
+
+Rotavision can read data directly from S3:
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Analyze data from S3
+result = client.vishwas.analyze(
+    model_id="my-model",
+    dataset={
+        "data_url": "s3://my-bucket/predictions.parquet",
+        "aws_credentials": {
+            "access_key_id": "AKIA...",
+            "secret_access_key": "...",
+            "region": "ap-south-1"
+        }
+    }
+)
+```
+
+### IAM Role (Recommended)
+
+For production, use IAM roles:
+
+1. Create an IAM role with S3 read access
+2. Add Rotavision's AWS account as trusted entity
+3. Configure in Rotavision dashboard
+
+```python
+# No credentials needed - uses assumed role
+result = client.vishwas.analyze(
+    model_id="my-model",
+    dataset={
+        "data_url": "s3://my-bucket/predictions.parquet"
+    }
+)
+```
+
+## SageMaker Integration
+
+### Monitor SageMaker Endpoints
+
+```python
+from rotavision.integrations.aws import SageMakerMonitor
+
+# Create monitor for SageMaker endpoint
+monitor = SageMakerMonitor(
+    endpoint_name="my-sagemaker-endpoint",
+    rotavision_api_key="rv_live_...",
+    aws_region="ap-south-1"
+)
+
+# Automatically logs inferences to Guardian
+monitor.start()
+```
+
+### SageMaker Pipeline Integration
+
+Add Rotavision to your SageMaker Pipeline:
+
+```python
+from sagemaker.workflow.steps import ProcessingStep
+from rotavision.integrations.aws import RotavisionProcessor
+
+# Fairness analysis step
+fairness_step = ProcessingStep(
+    name="FairnessAnalysis",
+    processor=RotavisionProcessor(
+        api_key="rv_live_...",
+        role=role,
+        instance_type="ml.m5.xlarge"
+    ),
+    inputs=[
+        ProcessingInput(source=predictions_uri, destination="/opt/ml/processing/input")
+    ],
+    code="analyze_fairness.py"
+)
+```
+
+## Bedrock Integration
+
+Route Sankalp requests to AWS Bedrock:
+
+```python
+# Sankalp automatically routes to Bedrock for supported models
+response = client.sankalp.proxy(
+    model="claude-3-sonnet",  # Routes to Bedrock
+    messages=[{"role": "user", "content": "Hello"}],
+    routing={
+        "provider_preference": ["bedrock", "anthropic"],
+        "data_residency": "india"
+    }
+)
+```
+
+### Configure Bedrock Access
+
+In Rotavision dashboard or via API:
+
+```python
+client.integrations.configure(
+    provider="aws_bedrock",
+    config={
+        "access_key_id": "AKIA...",
+        "secret_access_key": "...",
+        "region": "us-east-1"  # Bedrock region
+    }
+)
+```
+
+## CloudWatch Integration
+
+Export Rotavision metrics to CloudWatch:
+
+```python
+from rotavision.integrations.aws import CloudWatchExporter
+
+exporter = CloudWatchExporter(
+    namespace="Rotavision/ML",
+    region="ap-south-1"
+)
+
+# Metrics automatically pushed to CloudWatch
+monitor = client.guardian.create_monitor(
+    model_id="my-model",
+    metrics=["prediction_drift", "latency_p99"],
+    exporters=[exporter]
+)
+```
+
+## Terraform Module
+
+Deploy Rotavision integration with Terraform:
+
+```hcl
+module "rotavision" {
+  source = "rotavision/integration/aws"
+  version = "1.0.0"
+
+  rotavision_api_key = var.rotavision_api_key
+
+  # S3 buckets to grant access
+  s3_buckets = [
+    "my-ml-data-bucket",
+    "my-predictions-bucket"
+  ]
+
+  # SageMaker endpoints to monitor
+  sagemaker_endpoints = [
+    "prod-recommendation-endpoint",
+    "prod-fraud-detection-endpoint"
+  ]
+}
+```
+
+## IAM Policies
+
+### Minimal S3 Policy
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::my-bucket",
+        "arn:aws:s3:::my-bucket/*"
+      ]
+    }
+  ]
+}
+```
+
+### SageMaker Monitoring Policy
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sagemaker:InvokeEndpoint",
+        "sagemaker:DescribeEndpoint",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```

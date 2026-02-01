@@ -1,0 +1,83 @@
+---
+title: Track Fleet
+api: POST /gati/fleet/track
+description: "Update vehicle locations for real-time tracking"
+---
+
+## Request
+
+<ParamField body="updates" type="array" required>
+  Vehicle location updates.
+
+  <Expandable title="update properties">
+    <ParamField body="vehicle_id" type="string" required>
+      Vehicle identifier.
+    </ParamField>
+    <ParamField body="location" type="object" required>
+      Current location with lat/lng.
+    </ParamField>
+    <ParamField body="speed_kmh" type="number">
+      Current speed.
+    </ParamField>
+    <ParamField body="heading" type="number">
+      Heading in degrees (0-360).
+    </ParamField>
+    <ParamField body="timestamp" type="string">
+      ISO 8601 timestamp.
+    </ParamField>
+    <ParamField body="status" type="string">
+      Vehicle status: `moving`, `stopped`, `idle`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<RequestExample>
+```python Python
+client.gati.track_fleet(
+    updates=[
+        {
+            "vehicle_id": "v1",
+            "location": {"lat": 12.9450, "lng": 77.6100},
+            "speed_kmh": 35,
+            "heading": 90,
+            "status": "moving"
+        },
+        {
+            "vehicle_id": "v2",
+            "location": {"lat": 12.9600, "lng": 77.7200},
+            "speed_kmh": 0,
+            "status": "stopped"
+        }
+    ]
+)
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "processed": 2,
+  "vehicles": [
+    {
+      "vehicle_id": "v1",
+      "status": "moving",
+      "current_route": "opt_abc123",
+      "next_stop": {
+        "order_id": "order_5",
+        "eta": "2026-02-01T11:15:00Z",
+        "distance_km": 2.3
+      }
+    },
+    {
+      "vehicle_id": "v2",
+      "status": "stopped",
+      "stopped_duration_min": 12,
+      "current_stop": {
+        "order_id": "order_8",
+        "arrived_at": "2026-02-01T11:03:00Z"
+      }
+    }
+  ]
+}
+```
+</ResponseExample>

@@ -1,0 +1,247 @@
+---
+title: Node.js SDK
+description: "Official Node.js SDK for Rotavision"
+---
+
+## Installation
+
+```bash
+npm install @rotavision/sdk
+```
+
+Requirements: Node.js 18+
+
+## Quick Start
+
+```typescript
+import { Rotavision } from '@rotavision/sdk';
+
+// Initialize client
+const client = new Rotavision({
+  apiKey: 'rv_live_...'
+});
+
+// Or use environment variable ROTAVISION_API_KEY
+const client = new Rotavision();
+
+// Use any product
+const result = await client.vishwas.analyze({
+  modelId: 'my-model',
+  dataset: data
+});
+```
+
+## Configuration
+
+```typescript
+import { Rotavision } from '@rotavision/sdk';
+
+const client = new Rotavision({
+  apiKey: 'rv_live_...',
+  baseUrl: 'https://api.rotavision.com',  // Custom endpoint
+  timeout: 30000,                          // Request timeout (ms)
+  maxRetries: 3,                           // Retry attempts
+});
+```
+
+## Products
+
+### Vishwas - Fairness & Explainability
+
+```typescript
+// Analyze fairness
+const analysis = await client.vishwas.analyze({
+  modelId: 'loan-model',
+  dataset: {
+    features: ['age', 'income', 'gender'],
+    predictions: predictions,
+    actuals: actuals,
+    protectedAttributes: ['gender']
+  },
+  metrics: ['demographic_parity', 'equalized_odds']
+});
+
+console.log(`Score: ${analysis.overallScore}`);
+console.log(`Bias: ${analysis.biasDetected}`);
+
+// Explain prediction
+const explanation = await client.vishwas.explain({
+  modelId: 'loan-model',
+  inputData: { age: 30, income: 50000 },
+  prediction: 0.75,
+  method: 'shap'
+});
+
+console.log(explanation.summary);
+```
+
+### Guardian - Monitoring
+
+```typescript
+// Create monitor
+const monitor = await client.guardian.createMonitor({
+  modelId: 'recommendation-model',
+  name: 'Prod Monitor',
+  metrics: ['prediction_drift', 'latency_p99'],
+  alerts: [
+    { metric: 'prediction_drift', threshold: 0.2, severity: 'critical' }
+  ]
+});
+
+// Log inference
+await client.guardian.logInference({
+  monitorId: monitor.id,
+  inputData: features,
+  prediction: prediction,
+  latencyMs: 45
+});
+
+// Batch logging
+await client.guardian.logInferences({
+  monitorId: monitor.id,
+  inferences: [
+    { inputData: f1, prediction: p1, latencyMs: 40 },
+    { inputData: f2, prediction: p2, latencyMs: 42 },
+  ]
+});
+```
+
+### Dastavez - Document AI
+
+```typescript
+// Extract from document
+const result = await client.dastavez.extract({
+  documentType: 'aadhaar',
+  fileUrl: 'https://storage.example.com/doc.pdf'
+});
+
+console.log(`Name: ${result.fields.name}`);
+console.log(`Confidence: ${result.confidence}`);
+
+// From file buffer
+import fs from 'fs';
+const buffer = fs.readFileSync('document.pdf');
+const result = await client.dastavez.extract({
+  documentType: 'pan',
+  file: buffer
+});
+```
+
+### Sankalp - LLM Gateway
+
+```typescript
+// Proxy to LLM
+const response = await client.sankalp.proxy({
+  model: 'gpt-5-mini',
+  messages: [
+    { role: 'user', content: 'Hello!' }
+  ]
+});
+
+console.log(response.choices[0].message.content);
+
+// Streaming
+const stream = await client.sankalp.proxyStream({
+  model: 'claude-4.5-sonnet',
+  messages: [{ role: 'user', content: 'Write a story' }]
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0].delta.content || '');
+}
+```
+
+### Orchestrate - Workflows
+
+```typescript
+// Run workflow
+const execution = await client.orchestrate.runWorkflow({
+  workflowId: 'wf_abc123',
+  inputs: { query: 'Research AI in India' }
+});
+
+// Poll for completion
+const result = await client.orchestrate.waitForExecution(execution.id);
+console.log(result.outputs);
+```
+
+### Gati - Fleet Intelligence
+
+```typescript
+// Optimize routes
+const result = await client.gati.optimizeRoutes({
+  vehicles: [{ id: 'v1', capacity: 100, startLocation: {...} }],
+  orders: [{ id: 'o1', location: {...}, demand: 10 }]
+});
+
+result.routes.forEach(route => {
+  console.log(`Vehicle ${route.vehicleId}: ${route.stops.length} stops`);
+});
+```
+
+## TypeScript Support
+
+The SDK is written in TypeScript and provides full type definitions:
+
+```typescript
+import {
+  Rotavision,
+  VishwasAnalysis,
+  GuardianMonitor,
+  DastavezExtraction
+} from '@rotavision/sdk';
+
+const client = new Rotavision();
+
+// Full type inference
+const analysis: VishwasAnalysis = await client.vishwas.analyze({
+  modelId: 'my-model',
+  dataset: { ... }
+});
+```
+
+## Error Handling
+
+```typescript
+import {
+  RotavisionError,
+  AuthenticationError,
+  ValidationError,
+  RateLimitError,
+  NotFoundError
+} from '@rotavision/sdk/errors';
+
+try {
+  const result = await client.vishwas.analyze({ ... });
+} catch (e) {
+  if (e instanceof AuthenticationError) {
+    console.log('Invalid API key');
+  } else if (e instanceof ValidationError) {
+    console.log(`Invalid request: ${e.param}`);
+  } else if (e instanceof RateLimitError) {
+    console.log(`Rate limited, retry after ${e.retryAfter}s`);
+  } else if (e instanceof RotavisionError) {
+    console.log(`API error: ${e.message}`);
+  }
+}
+```
+
+## Logging
+
+```typescript
+import { Rotavision } from '@rotavision/sdk';
+
+const client = new Rotavision({
+  debug: true  // Enable debug logging
+});
+
+// Or use custom logger
+const client = new Rotavision({
+  logger: {
+    debug: (msg) => console.debug(msg),
+    info: (msg) => console.info(msg),
+    warn: (msg) => console.warn(msg),
+    error: (msg) => console.error(msg),
+  }
+});
+```

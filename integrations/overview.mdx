@@ -1,0 +1,85 @@
+---
+title: Integrations Overview
+description: "Connect Rotavision with your infrastructure"
+---
+
+## Overview
+
+Rotavision integrates with popular cloud providers, ML platforms, and enterprise systems.
+
+<CardGroup cols={2}>
+  <Card title="AWS" icon="aws" href="/integrations/aws">
+    S3, SageMaker, Bedrock
+  </Card>
+  <Card title="Azure" icon="microsoft" href="/integrations/azure">
+    Blob Storage, Azure ML, OpenAI
+  </Card>
+  <Card title="Google Cloud" icon="google" href="/integrations/gcp">
+    GCS, Vertex AI, Gemini
+  </Card>
+  <Card title="LangChain" icon="link" href="/integrations/langchain">
+    LangChain integration
+  </Card>
+  <Card title="LlamaIndex" icon="link" href="/integrations/llamaindex">
+    LlamaIndex integration
+  </Card>
+</CardGroup>
+
+## Integration Types
+
+### Data Sources
+
+Connect your data for analysis:
+- Cloud storage (S3, GCS, Azure Blob)
+- Data warehouses (Snowflake, BigQuery, Redshift)
+- Feature stores (Feast, Tecton)
+
+### ML Platforms
+
+Monitor models across platforms:
+- AWS SageMaker
+- Azure ML
+- Google Vertex AI
+- MLflow
+- Kubeflow
+
+### LLM Frameworks
+
+Add trust & monitoring to LLM apps:
+- LangChain
+- LlamaIndex
+- Haystack
+
+### Notifications
+
+Alert routing:
+- Slack
+- PagerDuty
+- Email
+- Custom webhooks
+
+## Quick Setup
+
+Most integrations follow this pattern:
+
+```python
+from rotavision import Rotavision
+from rotavision.integrations import AWSIntegration
+
+client = Rotavision()
+
+# Configure integration
+aws = AWSIntegration(
+    access_key_id="...",
+    secret_access_key="...",
+    region="ap-south-1"
+)
+
+# Use with Rotavision
+result = client.vishwas.analyze(
+    model_id="my-model",
+    dataset={
+        "data_url": "s3://my-bucket/data.parquet"  # Direct S3 access
+    }
+)
+```

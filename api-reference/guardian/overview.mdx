@@ -1,0 +1,100 @@
+---
+title: Guardian Overview
+description: "AI Reliability Monitoring APIs"
+---
+
+## Introduction
+
+Guardian provides real-time monitoring for AI systems in production. Detect drift, anomalies, and performance degradation before they impact users.
+
+<CardGroup cols={2}>
+  <Card title="Create Monitor" icon="plus" href="/api-reference/guardian/create-monitor">
+    Set up monitoring for a model
+  </Card>
+  <Card title="Log Inference" icon="database" href="/api-reference/guardian/log-inference">
+    Log predictions for monitoring
+  </Card>
+  <Card title="Get Alerts" icon="bell" href="/api-reference/guardian/get-alerts">
+    Retrieve triggered alerts
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Drift Detection
+
+| Type | Description | Method |
+|------|-------------|--------|
+| **Data Drift** | Input feature distribution changes | PSI, KS Test, Chi-Square |
+| **Prediction Drift** | Output distribution changes | KL Divergence, JS Distance |
+| **Concept Drift** | Relationship between inputs and outputs changes | Performance monitoring |
+| **Label Drift** | Ground truth distribution changes | Distribution comparison |
+
+### Anomaly Detection
+
+Guardian identifies unusual patterns in:
+
+- **Input anomalies**: Out-of-distribution inputs
+- **Output anomalies**: Unexpected predictions
+- **Latency anomalies**: Performance degradation
+- **Error spikes**: Increased failure rates
+
+### Alerting
+
+Configure alerts based on:
+
+- Metric thresholds (e.g., PSI > 0.2)
+- Percentage changes (e.g., accuracy drops 5%)
+- Anomaly detection
+- SLA violations
+
+## Quick Example
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Create a monitor
+monitor = client.guardian.create_monitor(
+    model_id="recommendation-v3",
+    name="Prod Recommendations",
+    metrics=["prediction_drift", "latency_p99", "error_rate"],
+    alerts=[
+        {"metric": "prediction_drift", "threshold": 0.1, "severity": "warning"},
+        {"metric": "prediction_drift", "threshold": 0.2, "severity": "critical"},
+        {"metric": "latency_p99", "threshold": 500, "severity": "warning"},
+    ]
+)
+
+# Log inferences (typically in your serving code)
+client.guardian.log_inference(
+    monitor_id=monitor.id,
+    input_data=features,
+    prediction=prediction,
+    latency_ms=45,
+    metadata={"user_segment": "premium"}
+)
+
+# Check for alerts
+alerts = client.guardian.get_alerts(
+    monitor_id=monitor.id,
+    status="active"
+)
+```
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/guardian/monitors` | Create a monitor |
+| `GET` | `/guardian/monitors/{id}` | Get monitor details |
+| `GET` | `/guardian/monitors` | List monitors |
+| `PATCH` | `/guardian/monitors/{id}` | Update monitor config |
+| `DELETE` | `/guardian/monitors/{id}` | Delete a monitor |
+| `POST` | `/guardian/monitors/{id}/inferences` | Log single inference |
+| `POST` | `/guardian/monitors/{id}/inferences/batch` | Log batch of inferences |
+| `GET` | `/guardian/monitors/{id}/metrics` | Get monitoring metrics |
+| `GET` | `/guardian/monitors/{id}/alerts` | Get monitor alerts |
+| `POST` | `/guardian/alerts/{id}/acknowledge` | Acknowledge an alert |
+| `POST` | `/guardian/alerts/{id}/resolve` | Resolve an alert |

@@ -1,0 +1,181 @@
+---
+title: Run Workflow
+api: POST /dastavez/agents/{agent_id}/workflows
+description: "Execute a browser automation workflow"
+---
+
+## Request
+
+<ParamField path="agent_id" type="string" required>
+  The agent ID to run the workflow on.
+</ParamField>
+
+<ParamField body="workflow" type="object" required>
+  Workflow definition.
+
+  <Expandable title="workflow properties">
+    <ParamField body="steps" type="array" required>
+      Ordered list of workflow steps.
+    </ParamField>
+    <ParamField body="on_error" type="string" default="stop">
+      Error handling: `stop`, `continue`, `retry`.
+    </ParamField>
+    <ParamField body="max_retries" type="integer" default="3">
+      Maximum retries per step.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="inputs" type="object">
+  Input variables for the workflow.
+</ParamField>
+
+<ParamField body="webhook_url" type="string">
+  URL for completion webhook.
+</ParamField>
+
+### Step Types
+
+| Action | Description | Parameters |
+|--------|-------------|------------|
+| `navigate` | Go to URL | `url` |
+| `click` | Click element | `selector`, `wait_for` |
+| `type` | Type text | `selector`, `text`, `clear` |
+| `extract` | Extract data | `selector`, `attribute`, `multiple` |
+| `screenshot` | Capture screen | `full_page`, `selector` |
+| `download` | Download file | `selector`, `wait_for` |
+| `wait` | Wait for element/time | `selector`, `timeout`, `duration` |
+| `login` | Authenticate | `credentials_key` |
+| `conditional` | If/else logic | `condition`, `then`, `else` |
+| `loop` | Iterate | `items`, `steps` |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/dastavez/agents/agent_xyz789/workflows \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workflow": {
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "https://services.gst.gov.in"
+        },
+        {
+          "action": "login",
+          "credentials_key": "gst_portal"
+        },
+        {
+          "action": "wait",
+          "selector": ".dashboard-loaded",
+          "timeout": 10000
+        },
+        {
+          "action": "click",
+          "selector": "[data-menu=\"returns\"]"
+        },
+        {
+          "action": "extract",
+          "selector": ".returns-table tr",
+          "multiple": true,
+          "fields": {
+            "period": "td:nth-child(1)",
+            "status": "td:nth-child(2)",
+            "filed_date": "td:nth-child(3)"
+          }
+        },
+        {
+          "action": "screenshot",
+          "full_page": false
+        }
+      ]
+    },
+    "inputs": {
+      "financial_year": "2025-26"
+    }
+  }'
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+execution = client.dastavez.run_workflow(
+    agent_id="agent_xyz789",
+    workflow={
+        "steps": [
+            {"action": "navigate", "url": "https://services.gst.gov.in"},
+            {"action": "login", "credentials_key": "gst_portal"},
+            {"action": "wait", "selector": ".dashboard-loaded", "timeout": 10000},
+            {"action": "click", "selector": "[data-menu='returns']"},
+            {
+                "action": "extract",
+                "selector": ".returns-table tr",
+                "multiple": True,
+                "fields": {
+                    "period": "td:nth-child(1)",
+                    "status": "td:nth-child(2)",
+                    "filed_date": "td:nth-child(3)"
+                }
+            },
+            {"action": "screenshot", "full_page": False}
+        ]
+    },
+    inputs={"financial_year": "2025-26"}
+)
+
+# Poll for completion
+result = client.dastavez.get_workflow(execution.id)
+print(f"Extracted data: {result.outputs['extracted_data']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json 202 - Running
+{
+  "id": "workflow_exec_123",
+  "agent_id": "agent_xyz789",
+  "status": "running",
+  "progress": {
+    "current_step": 2,
+    "total_steps": 6,
+    "current_action": "login"
+  },
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+
+```json 200 - Completed
+{
+  "id": "workflow_exec_123",
+  "agent_id": "agent_xyz789",
+  "status": "completed",
+  "outputs": {
+    "extracted_data": [
+      {
+        "period": "January 2026",
+        "status": "Filed",
+        "filed_date": "2026-02-10"
+      },
+      {
+        "period": "December 2025",
+        "status": "Filed",
+        "filed_date": "2026-01-11"
+      }
+    ],
+    "screenshots": [
+      {
+        "step": 6,
+        "url": "https://storage.rotavision.com/screenshots/workflow_exec_123_step6.png",
+        "expires_at": "2026-02-02T10:30:00Z"
+      }
+    ]
+  },
+  "steps_completed": 6,
+  "duration_ms": 45000,
+  "created_at": "2026-02-01T10:30:00Z",
+  "completed_at": "2026-02-01T10:30:45Z"
+}
+```
+</ResponseExample>

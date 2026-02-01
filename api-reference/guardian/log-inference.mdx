@@ -1,0 +1,191 @@
+---
+title: Log Inference
+api: POST /guardian/monitors/{monitor_id}/inferences
+description: "Log a model inference for monitoring"
+---
+
+## Request
+
+<ParamField path="monitor_id" type="string" required>
+  The monitor ID to log to.
+</ParamField>
+
+<ParamField body="input_data" type="object">
+  Input features for the inference. Used for data drift detection.
+</ParamField>
+
+<ParamField body="prediction" type="any" required>
+  The model's prediction output.
+</ParamField>
+
+<ParamField body="actual" type="any">
+  Ground truth label (if available). Used for accuracy monitoring.
+</ParamField>
+
+<ParamField body="latency_ms" type="number">
+  Inference latency in milliseconds.
+</ParamField>
+
+<ParamField body="error" type="object">
+  Error details if the inference failed.
+
+  <Expandable title="error properties">
+    <ParamField body="code" type="string">
+      Error code.
+    </ParamField>
+    <ParamField body="message" type="string">
+      Error message.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Additional metadata for segmentation and analysis.
+</ParamField>
+
+<ParamField body="timestamp" type="string">
+  ISO 8601 timestamp. Defaults to current time.
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/guardian/monitors/mon_abc123/inferences \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_data": {
+      "user_id": "u123",
+      "category": "electronics",
+      "price_range": "mid",
+      "session_duration": 245
+    },
+    "prediction": {
+      "product_ids": ["p456", "p789", "p012"],
+      "scores": [0.92, 0.87, 0.81]
+    },
+    "latency_ms": 45,
+    "metadata": {
+      "user_segment": "premium",
+      "region": "north",
+      "platform": "mobile"
+    }
+  }'
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Log individual inference
+client.guardian.log_inference(
+    monitor_id="mon_abc123",
+    input_data={
+        "user_id": "u123",
+        "category": "electronics",
+        "price_range": "mid",
+        "session_duration": 245
+    },
+    prediction={
+        "product_ids": ["p456", "p789", "p012"],
+        "scores": [0.92, 0.87, 0.81]
+    },
+    latency_ms=45,
+    metadata={
+        "user_segment": "premium",
+        "region": "north",
+        "platform": "mobile"
+    }
+)
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "id": "inf_xyz789",
+  "monitor_id": "mon_abc123",
+  "logged_at": "2026-02-01T10:30:00Z"
+}
+```
+</ResponseExample>
+
+## Batch Logging
+
+For high-throughput scenarios, use the batch endpoint:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/guardian/monitors/mon_abc123/inferences/batch \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inferences": [
+      {
+        "input_data": {...},
+        "prediction": {...},
+        "latency_ms": 45,
+        "timestamp": "2026-02-01T10:30:00Z"
+      },
+      {
+        "input_data": {...},
+        "prediction": {...},
+        "latency_ms": 52,
+        "timestamp": "2026-02-01T10:30:01Z"
+      }
+    ]
+  }'
+```
+
+```python Python
+# Log batch of inferences
+client.guardian.log_inferences(
+    monitor_id="mon_abc123",
+    inferences=[
+        {
+            "input_data": {...},
+            "prediction": {...},
+            "latency_ms": 45,
+        },
+        {
+            "input_data": {...},
+            "prediction": {...},
+            "latency_ms": 52,
+        }
+    ]
+)
+```
+
+</CodeGroup>
+
+<Info>
+  Batch endpoint accepts up to 1,000 inferences per request. For very high throughput, consider using async logging with a queue.
+</Info>
+
+## Async Logging
+
+For minimal latency impact on your serving path:
+
+```python
+from rotavision import Rotavision
+from rotavision.logging import AsyncLogger
+
+# Create async logger (uses background thread)
+logger = AsyncLogger(
+    api_key="rv_live_...",
+    monitor_id="mon_abc123",
+    batch_size=100,
+    flush_interval_ms=1000
+)
+
+# In your serving code - returns immediately
+logger.log(
+    input_data=features,
+    prediction=prediction,
+    latency_ms=latency
+)
+
+# Ensure flushing on shutdown
+logger.flush()
+```

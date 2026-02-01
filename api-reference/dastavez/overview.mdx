@@ -1,0 +1,120 @@
+---
+title: Dastavez Overview
+description: "Document AI & Browser Agent APIs"
+---
+
+## Introduction
+
+Dastavez provides intelligent document extraction for Indian documents and browser automation agents for web-based workflows.
+
+<CardGroup cols={2}>
+  <Card title="Extract Document" icon="file-lines" href="/api-reference/dastavez/extract-document">
+    Extract structured data from documents
+  </Card>
+  <Card title="Create Agent" icon="robot" href="/api-reference/dastavez/create-agent">
+    Create browser automation agents
+  </Card>
+  <Card title="Run Workflow" icon="play" href="/api-reference/dastavez/run-workflow">
+    Execute agent workflows
+  </Card>
+</CardGroup>
+
+## Document Extraction
+
+### Supported Documents
+
+| Category | Document Types |
+|----------|----------------|
+| **Identity** | Aadhaar, PAN, Voter ID, Passport, Driving License |
+| **Financial** | Bank Statements, ITR, Form 16, Salary Slips |
+| **Business** | GST Invoice, GST Returns, Company Registration, MSME Certificate |
+| **Legal** | Property Documents, Sale Deed, Rental Agreement |
+| **Education** | Mark Sheets, Degree Certificates, Transcripts |
+| **Healthcare** | Prescriptions, Lab Reports, Insurance Claims |
+
+### Multi-Language OCR
+
+Dastavez supports extraction from documents in:
+
+- Hindi, English, Tamil, Telugu, Bengali
+- Marathi, Gujarati, Kannada, Malayalam
+- Punjabi, Odia, Assamese
+
+### Extraction Quality
+
+| Feature | Capability |
+|---------|------------|
+| **Accuracy** | 98%+ for standard Indian documents |
+| **Handwriting** | Supported for select fields |
+| **Image Quality** | Auto-enhancement for low-quality scans |
+| **Validation** | Built-in checksum and format validation |
+
+## Browser Agents
+
+### Capabilities
+
+- Navigate websites and web applications
+- Fill forms and submit data
+- Extract data from web pages
+- Handle authentication flows
+- Take screenshots and generate PDFs
+
+### Use Cases
+
+- Government portal automation (GST, MCA, EPFO)
+- Bank statement downloads
+- Insurance policy retrieval
+- Compliance data collection
+
+## Quick Example
+
+```python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+# Extract from Aadhaar card
+result = client.dastavez.extract(
+    document_type="aadhaar",
+    file_url="s3://my-bucket/aadhaar-scan.pdf",
+    options={
+        "mask_number": True,  # Mask Aadhaar number in response
+        "extract_photo": True
+    }
+)
+
+print(f"Name: {result.fields['name']}")
+print(f"DOB: {result.fields['dob']}")
+print(f"Confidence: {result.confidence}")
+
+# Create browser agent for GST portal
+agent = client.dastavez.create_agent(
+    name="GST Returns Fetcher",
+    capabilities=["navigate", "login", "extract", "download"]
+)
+
+# Run workflow
+execution = client.dastavez.run_workflow(
+    agent_id=agent.id,
+    workflow={
+        "steps": [
+            {"action": "navigate", "url": "https://gst.gov.in"},
+            {"action": "login", "credentials_key": "gst_portal"},
+            {"action": "extract", "selector": ".returns-table"},
+            {"action": "download", "selector": ".gstr1-pdf"}
+        ]
+    }
+)
+```
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/dastavez/extract` | Extract from document |
+| `GET` | `/dastavez/extractions/{id}` | Get extraction result |
+| `GET` | `/dastavez/extractions` | List extractions |
+| `POST` | `/dastavez/agents` | Create browser agent |
+| `GET` | `/dastavez/agents/{id}` | Get agent details |
+| `POST` | `/dastavez/agents/{id}/workflows` | Run agent workflow |
+| `GET` | `/dastavez/workflows/{id}` | Get workflow status |

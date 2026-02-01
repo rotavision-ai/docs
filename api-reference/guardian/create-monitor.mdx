@@ -1,0 +1,211 @@
+---
+title: Create Monitor
+api: POST /guardian/monitors
+description: "Create a new monitoring configuration for a model"
+---
+
+## Request
+
+<ParamField body="model_id" type="string" required>
+  Unique identifier for the model to monitor.
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Human-readable name for the monitor.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Description of what this monitor tracks.
+</ParamField>
+
+<ParamField body="metrics" type="array" required>
+  Metrics to track:
+  - `prediction_drift` - Output distribution drift (PSI)
+  - `data_drift` - Input feature drift
+  - `accuracy` - Accuracy vs ground truth (requires labels)
+  - `latency_p50` - 50th percentile latency
+  - `latency_p95` - 95th percentile latency
+  - `latency_p99` - 99th percentile latency
+  - `error_rate` - Percentage of failed predictions
+  - `throughput` - Requests per second
+</ParamField>
+
+<ParamField body="baseline" type="object">
+  Baseline data for drift comparison.
+
+  <Expandable title="baseline properties">
+    <ParamField body="data_url" type="string">
+      URL to baseline dataset (CSV/Parquet).
+    </ParamField>
+    <ParamField body="window" type="string">
+      Use recent production data as baseline: `7d`, `30d`, `90d`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="alerts" type="array">
+  Alert configurations.
+
+  <Expandable title="alert properties">
+    <ParamField body="metric" type="string" required>
+      Metric to alert on.
+    </ParamField>
+    <ParamField body="threshold" type="number" required>
+      Threshold value.
+    </ParamField>
+    <ParamField body="operator" type="string" default="gt">
+      Comparison: `gt`, `lt`, `gte`, `lte`.
+    </ParamField>
+    <ParamField body="severity" type="string" default="warning">
+      Alert severity: `info`, `warning`, `critical`.
+    </ParamField>
+    <ParamField body="window" type="string" default="1h">
+      Evaluation window: `5m`, `15m`, `1h`, `6h`, `24h`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="notifications" type="object">
+  Notification channels.
+
+  <Expandable title="notifications properties">
+    <ParamField body="email" type="array">
+      Email addresses for alerts.
+    </ParamField>
+    <ParamField body="slack_webhook" type="string">
+      Slack incoming webhook URL.
+    </ParamField>
+    <ParamField body="pagerduty_key" type="string">
+      PagerDuty integration key.
+    </ParamField>
+    <ParamField body="webhook_url" type="string">
+      Custom webhook URL.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="schedule" type="object">
+  Monitoring schedule.
+
+  <Expandable title="schedule properties">
+    <ParamField body="evaluation_interval" type="string" default="1h">
+      How often to evaluate metrics: `5m`, `15m`, `1h`, `6h`, `24h`.
+    </ParamField>
+    <ParamField body="active_hours" type="object">
+      Only monitor during specific hours (UTC).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/guardian/monitors \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_id": "recommendation-v3",
+    "name": "Production Recommendations",
+    "description": "Monitoring for product recommendation model",
+    "metrics": ["prediction_drift", "data_drift", "latency_p99", "error_rate"],
+    "baseline": {
+      "window": "30d"
+    },
+    "alerts": [
+      {
+        "metric": "prediction_drift",
+        "threshold": 0.1,
+        "severity": "warning"
+      },
+      {
+        "metric": "prediction_drift",
+        "threshold": 0.2,
+        "severity": "critical"
+      },
+      {
+        "metric": "latency_p99",
+        "threshold": 500,
+        "severity": "warning"
+      },
+      {
+        "metric": "error_rate",
+        "threshold": 0.01,
+        "severity": "critical"
+      }
+    ],
+    "notifications": {
+      "email": ["ml-team@company.com"],
+      "slack_webhook": "https://hooks.slack.com/services/..."
+    }
+  }'
+```
+
+```python Python
+from rotavision import Rotavision
+
+client = Rotavision()
+
+monitor = client.guardian.create_monitor(
+    model_id="recommendation-v3",
+    name="Production Recommendations",
+    description="Monitoring for product recommendation model",
+    metrics=["prediction_drift", "data_drift", "latency_p99", "error_rate"],
+    baseline={"window": "30d"},
+    alerts=[
+        {"metric": "prediction_drift", "threshold": 0.1, "severity": "warning"},
+        {"metric": "prediction_drift", "threshold": 0.2, "severity": "critical"},
+        {"metric": "latency_p99", "threshold": 500, "severity": "warning"},
+        {"metric": "error_rate", "threshold": 0.01, "severity": "critical"},
+    ],
+    notifications={
+        "email": ["ml-team@company.com"],
+        "slack_webhook": "https://hooks.slack.com/services/..."
+    }
+)
+
+print(f"Monitor ID: {monitor.id}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201 - Created
+{
+  "id": "mon_abc123",
+  "model_id": "recommendation-v3",
+  "name": "Production Recommendations",
+  "description": "Monitoring for product recommendation model",
+  "status": "active",
+  "metrics": ["prediction_drift", "data_drift", "latency_p99", "error_rate"],
+  "baseline": {
+    "type": "rolling_window",
+    "window": "30d",
+    "status": "collecting"
+  },
+  "alerts": [
+    {
+      "id": "alert_cfg_1",
+      "metric": "prediction_drift",
+      "threshold": 0.1,
+      "operator": "gt",
+      "severity": "warning",
+      "window": "1h"
+    },
+    {
+      "id": "alert_cfg_2",
+      "metric": "prediction_drift",
+      "threshold": 0.2,
+      "operator": "gt",
+      "severity": "critical",
+      "window": "1h"
+    }
+  ],
+  "notifications": {
+    "email": ["ml-team@company.com"],
+    "slack_webhook": "https://hooks.slack.com/services/..."
+  },
+  "schedule": {
+    "evaluation_interval": "1h"
+  },
+  "created_at": "2026-02-01T10:00:00Z"
+}
+```
+</ResponseExample>

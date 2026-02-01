@@ -1,0 +1,67 @@
+---
+title: Run Workflow
+api: POST /orchestrate/workflows/{workflow_id}/run
+description: "Execute a workflow"
+---
+
+## Request
+
+<ParamField path="workflow_id" type="string" required>
+  The workflow ID to run.
+</ParamField>
+
+<ParamField body="inputs" type="object" required>
+  Input variables for the workflow.
+</ParamField>
+
+<ParamField body="config" type="object">
+  Runtime configuration overrides.
+</ParamField>
+
+<ParamField body="webhook_url" type="string">
+  URL for completion webhook.
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.rotavision.com/v1/orchestrate/workflows/wf_abc123/run \
+  -H "Authorization: Bearer rv_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "ticket": "I have been waiting for my refund for 2 weeks. Order #12345. This is unacceptable!"
+    }
+  }'
+```
+
+```python Python
+execution = client.orchestrate.run_workflow(
+    workflow_id="wf_abc123",
+    inputs={
+        "ticket": "I have been waiting for my refund for 2 weeks. Order #12345."
+    }
+)
+
+print(f"Execution ID: {execution.id}")
+print(f"Status: {execution.status}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json 202 - Running
+{
+  "id": "exec_xyz789",
+  "workflow_id": "wf_abc123",
+  "status": "running",
+  "current_step": "classifier",
+  "progress": {
+    "completed": 0,
+    "total": 3
+  },
+  "inputs": {
+    "ticket": "I have been waiting for my refund for 2 weeks..."
+  },
+  "created_at": "2026-02-01T10:30:00Z"
+}
+```
+</ResponseExample>
