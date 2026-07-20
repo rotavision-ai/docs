@@ -1,0 +1,118 @@
+---
+title: Google ADK
+description: "Govern agents built with Google's Agent Development Kit: one plugin witnesses every model and tool call in the agent tree, and can enforce autonomy in the tool path, with no hard dependency on google-adk."
+---
+
+Google's Agent Development Kit runs agents through a `Runner`, and the Runner
+invokes registered plugins around every agent, model, and tool step. Sakshi ships
+such a plugin. Register `SakshiAdkPlugin` once on the Runner and every model call
+and tool call in the whole agent tree is witnessed on the active decision. Turn on
+`enforce` and each tool call is routed through the agent's autonomy envelope before
+it runs. The plugin does not import `google-adk` at module load, so it degrades
+cleanly and carries no version lock.
+
+## Install
+
+```bash
+pip install sakshi-sdk google-adk
+```
+
+## Register the plugin
+
+Pass `SakshiAdkPlugin` to the Runner's `plugins` list, and open a witness session
+around the run. Every model and tool call inside lands on that decision.
+
+<CodeGroup>
+
+```python Before
+from google.adk.runners import Runner
+
+runner = Runner(
+    agent=root_agent,
+    app_name="loans",
+    session_service=session_service,
+)
+
+async for event in runner.run_async(user_id="u1", session_id="s1",
+                                     new_message=message):
+    ...
+```
+
+```python After
+from google.adk.runners import Runner
+from sakshi import SakshiClient
+from sakshi.middleware import SakshiAdkPlugin
+
+client = SakshiClient("https://sakshi.your-company.internal", api_key="sks_...")
+
+runner = Runner(
+    agent=root_agent,
+    app_name="loans",
+    session_service=session_service,
+    plugins=[SakshiAdkPlugin(client, "loan-decision-agent")],
+)
+
+with client.witness("loan-decision-agent", client_ref="APP-2026-04471") as decision:
+    async for event in runner.run_async(user_id="u1", session_id="s1",
+                                        new_message=message):
+        ...
+    decision.action(outcome="approved", mode="auto")
+```
+
+</CodeGroup>
+
+## What gets witnessed
+
+The plugin records onto the active witness session as the agent runs:
+
+- **Model calls** become `llm_call` steps with latency, token usage, the finish
+  reason, and the served model identity (RBI draft MRM para 56). ADK agents usually
+  run on Gemini, but the plugin reads the model generically, so LiteLLM-backed
+  models are recorded too.
+- **Tool calls** become `tool_call` steps with the tool name, the argument keys
+  (never the values, which are tokenized at ingest anyway), the latency, and the
+  result status. A tool that raises is recorded as an error, since failures are
+  evidence too.
+- **Agents** are bracketed with `agent_start` and `agent_end` steps, so a
+  multi-agent tree reads as nested control flow on the chain.
+
+## Enforce in the tool path
+
+With `enforce=True`, the plugin routes each tool call through the agent's autonomy
+envelope in `before_tool_callback`, before the tool runs. An `auto` outcome lets
+the tool proceed. Anything else (review or block) stops the tool and returns a
+structured "parked for review" result to the agent instead of executing it. This
+is the same tool-path boundary as the MCP proxy, applied inside ADK.
+
+```python
+plugin = SakshiAdkPlugin(
+    client,
+    "loan-decision-agent",
+    enforce=True,
+    exempt_tools=("check_credit", "lookup_customer"),   # read-only, never gated
+    stakes_fields=("amount", "stakes", "value"),         # read stakes from tool args
+    confidence_fields=("confidence", "score"),
+)
+```
+
+The stakes and confidence signals are read from the tool's own arguments by the
+field names you configure, and passed to the envelope. A read-only tool listed in
+`exempt_tools` is never gated.
+
+<Warning>
+  Enforcement is **fail-closed**: if Sakshi is unreachable, a governed tool is
+  blocked rather than run ungoverned. Witnessing is **fail-open**: a recording
+  problem never breaks the agent, and with no active witness session the plugin is
+  a no-op. `enforce=True` requires the client and the agent id.
+</Warning>
+
+## Combine with MCP tools
+
+If your ADK agent reaches tools over the Model Context Protocol, you can also govern
+that layer with the [MCP integration](/integrations/mcp), which detects tool-manifest
+poisoning. The two compose: the ADK plugin governs the agent's own tool calls, and
+the MCP surface governs the MCP tool boundary.
+
+<Card title="Full SDK reference" icon="code" href="/sdk/python">
+  The client, the witness session, and enforcement.
+</Card>

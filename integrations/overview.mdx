@@ -56,6 +56,10 @@ decision).
   <Card title="LangGraph" icon="diagram-project" href="/integrations/langgraph">
     Bracket a compiled graph and witness individual nodes.
   </Card>
+  <Card title="Google ADK" icon="google" href="/integrations/adk">
+    Register one plugin on the Runner to witness the whole agent tree, and
+    optionally enforce in the tool path.
+  </Card>
 </CardGroup>
 
 | Runtime | Function | Wraps |
@@ -65,6 +69,7 @@ decision).
 | Google Gemini | `watch_gemini` | `models.generate_content` |
 | AWS Bedrock | `watch_bedrock` | `converse` |
 | LangGraph | `watch_langgraph`, `witness_node` | a compiled graph, a node callable |
+| Google ADK | `SakshiAdkPlugin` | a Runner plugin (witness the tree, enforce the tool path) |
 | MCP | `watch_mcp` | an MCP client session |
 
 Every function lives in `sakshi.middleware`:
@@ -78,6 +83,7 @@ from sakshi.middleware import (
     watch_langgraph,
     witness_node,
     watch_mcp,
+    SakshiAdkPlugin,
 )
 ```
 
