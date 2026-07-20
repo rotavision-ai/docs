@@ -1,0 +1,98 @@
+---
+title: API Reference
+description: "Orient to the Sakshi HTTP API: base URL, the /api/v1 version prefix, Bearer authentication, and the module tags the endpoints are grouped under."
+---
+
+This is the reference for the Sakshi HTTP API. The endpoint pages under
+**Endpoints** are generated from the live OpenAPI spec, so they always match the
+version of Sakshi you are running. This page orients you before you go there.
+
+## Base URL
+
+Sakshi is single-tenant and runs in your environment, so the base URL is your
+own deployment:
+
+```
+https://sakshi.your-company.internal
+```
+
+The public demo at `https://demo.rotavision.com` serves the same API, read-only,
+over synthetic data. Every path below is relative to your base URL.
+
+## Versioning
+
+All endpoints live under a version prefix:
+
+```
+/api/v1
+```
+
+New capabilities are added within `v1`. A breaking change would move to a new
+prefix, so a URL that works today keeps working.
+
+## Authentication
+
+Every request carries a Bearer token in the `Authorization` header:
+
+```
+Authorization: Bearer <token>
+```
+
+The token is either an **ingest API key** (register and witness) or an **OIDC
+JWT** from your IdP (governance and admin actions). Which one you need depends on
+the endpoint. See [Authentication](/authentication) for how to mint, use, and
+rotate them, and [Errors](/errors) for what `401` and `403` mean.
+
+## Modules
+
+The endpoints are grouped by tag, one per capability, plus two for the calling
+principal and access control:
+
+<CardGroup cols={2}>
+  <Card title="register" icon="clipboard-list" href="/concepts/know-your-agent">
+    Know Your Agent. Agents and models, ownership and provenance, attestations,
+    verified agent identity, and the ingest keys and webhooks that feed the
+    platform.
+  </Card>
+  <Card title="witness" icon="eye" href="/concepts/decision-chain">
+    The flight recorder. Capture a decision to the tamper-evident chain, list
+    records, and recompute the chain with `chain/verify` and `chain/head`.
+  </Card>
+  <Card title="bound" icon="shield-halved" href="/concepts/autonomy-envelopes">
+    Autonomy envelopes and enforcement. Evaluate an intended action, request a
+    human handoff, drive the kill switch and circuit breakers, and work the
+    review queues.
+  </Card>
+  <Card title="vidhi" icon="gavel" href="/concepts/evidence-packs">
+    Evidence. Regulator-mapped clause maps and readiness, signed evidence packs,
+    incident register, evaluation runs, DPIA support, and audit bundles.
+  </Card>
+  <Card title="vishwas" icon="scale-balanced" href="/guides/fairness-screening">
+    Declared-first fairness. Declared and locality screens, pre-deploy runs, and
+    the extraction, disposition, and MCP governance screens.
+  </Card>
+  <Card title="access" icon="user-lock" href="/authentication">
+    Admin-only. The entitlement mapping from IdP roles and groups to a Sakshi
+    role and org unit, kept as chain-attested config.
+  </Card>
+  <Card title="me" icon="id-badge" href="/authentication">
+    The calling principal: the resolved entitlements for your token and your
+    briefing.
+  </Card>
+</CardGroup>
+
+## Using the reference
+
+Each endpoint page shows its method, path, parameters, request body, and
+response schema, with a live request panel. Point it at your deployment, paste a
+Bearer token, and call it.
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Ingest keys versus OIDC JWTs, and when each is required.
+  </Card>
+  <Card title="Python SDK" icon="code" href="/sdk/python">
+    For most integrations, use the SDK instead of raw HTTP: it wraps these
+    endpoints, buffers capture, and models the enforcement outcomes.
+  </Card>
+</CardGroup>

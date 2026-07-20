@@ -1,0 +1,170 @@
+---
+title: Govern an MCP agent
+description: "Two ways to bring an agent that speaks the Model Context Protocol under governance: run Sakshi's MCP server, or drop the interception proxy in front of the agent's real MCP server."
+---
+
+Any agent that speaks the [Model Context Protocol](https://modelcontextprotocol.io)
+can be governed without touching its code. There are two approaches. Run
+Sakshi's MCP server and the agent gains governance tools it can call. Or drop
+the interception proxy between the agent and its real MCP server, and every tool
+call is witnessed and, optionally, enforced in the tool path. Both make
+tool-manifest poisoning visible on the chain, and neither ever sees a raw
+identifier: each is a client of the Sakshi API, so calls ride the same
+tokenization and hash-chain path as any other ingest.
+
+## Option A: run Sakshi's MCP server
+
+`sakshi-mcp` exposes governance as three MCP tools. The agent opts in by
+calling them: it is the MCP analogue of the SDK, so it is evidence plus advisory
+enforcement.
+
+| Tool | When the agent calls it |
+|---|---|
+| `enforce_action` | Before a consequential action, to get `auto` / `async_review` / `sync_review` / `block` |
+| `witness_decision` | After executing one, to record it and get the chain sequence number and hash |
+| `check_readiness` | Any time, for the live regulator-readiness score per instrument |
+
+<Steps>
+  <Step title="Install the server">
+    ```bash
+    pip install sakshi-mcp
+    ```
+  </Step>
+
+  <Step title="Configure it in an MCP host">
+    Point the host (Claude Desktop, Cursor, an agent framework) at the
+    `sakshi-mcp` command. `SAKSHI_MCP_API_KEY` is a Sakshi ingest key.
+
+    ```json MCP host config
+    {
+      "mcpServers": {
+        "sakshi-governance": {
+          "command": "sakshi-mcp",
+          "env": {
+            "SAKSHI_API_URL": "https://sakshi.your-bank.internal",
+            "SAKSHI_MCP_API_KEY": "sks_..."
+          }
+        }
+      }
+    }
+    ```
+
+    To run it directly instead, stdio is the default and streamable-http is
+    opt-in:
+
+    ```bash
+    SAKSHI_API_URL=... SAKSHI_MCP_API_KEY=sks_... sakshi-mcp     # stdio (default)
+    SAKSHI_MCP_TRANSPORT=streamable-http sakshi-mcp             # serve over HTTP
+    ```
+  </Step>
+
+  <Step title="Have the agent honour the outcome">
+    The agent calls `enforce_action` before any tool that moves money, changes
+    records, or contacts a customer, and honours the result: if `allowed` is
+    false, it stops and surfaces the reasons instead of acting. A kill switch or
+    safe mode outranks the envelope. After executing an allowed action, it calls
+    `witness_decision` to put the receipt on the chain.
+  </Step>
+</Steps>
+
+<Note>
+  This path is opt-in: the agent chooses to consult the tools. When the agent
+  must not be able to skip governance, use the interception proxy below, which
+  enforces in the tool path.
+</Note>
+
+## Option B: drop the interception proxy in front
+
+`sakshi-mcp-proxy` sits between the agent and its real MCP server. It relays
+every JSON-RPC message verbatim, so capability negotiation, resources, and
+prompts pass through untouched, and it taps only the messages it governs.
+
+```text
+agent  <--stdio-->  sakshi-mcp-proxy  <--stdio-->  real MCP server
+```
+
+<Steps>
+  <Step title="Point the host at the proxy">
+    Replace the agent's downstream server command with the proxy, followed by
+    `--` and the real command. The agent imports nothing and changes nothing.
+
+    ```bash
+    SAKSHI_API_URL=https://sakshi.your-bank.internal \
+    SAKSHI_MCP_API_KEY=sks_... \
+    sakshi-mcp-proxy --agent-id $AGENT_ID -- \
+      npx -y @modelcontextprotocol/server-filesystem /data
+    ```
+
+    A remote downstream works too, over streamable-http:
+
+    ```bash
+    sakshi-mcp-proxy --agent-id $AGENT_ID --http https://tools.example/mcp --header "Authorization: Bearer ..."
+    ```
+  </Step>
+
+  <Step title="Witness transparently (default)">
+    By default the proxy is transparent: it observes and witnesses, it does not
+    block. Every `tools/call` lands an `mcp_tool_call` step with the arguments
+    tokenized at ingest, and every `tools/list` result is hashed. Tapping is
+    best-effort, so a witness failure never breaks or delays a relayed message.
+
+    If a tool's description or schema changes mid-session, the manifest hash
+    moves and an `mcp_manifest_changed` finding lands on the chain. That is
+    tool poisoning made visible (the OWASP MCP Top 10 class), attributed to the
+    specific tool that changed, rather than a silent success.
+  </Step>
+
+  <Step title="Enforce in the tool path (optional)">
+    Set `SAKSHI_MCP_ENFORCE=on` and each `tools/call` is routed through the
+    agent's envelope before it reaches the tool. An `auto` outcome is forwarded;
+    anything else is stopped and the agent gets a "parked for review" reply,
+    never the tool. A tool poisoned mid-session is blocked outright.
+
+    ```bash
+    SAKSHI_MCP_ENFORCE=on \
+    SAKSHI_MCP_FAILCLOSED_STAKES=200000 \
+    SAKSHI_MCP_EXEMPT_TOOLS=get_balance,search \
+    SAKSHI_MCP_STAKES_FIELDS=amount,amount_inr,value \
+    sakshi-mcp-proxy --agent-id $AGENT_ID -- <real server command...>
+    ```
+
+    | Variable | Effect |
+    |---|---|
+    | `SAKSHI_MCP_ENFORCE` | `on` enables tool-path blocking (default: observe only) |
+    | `SAKSHI_MCP_FAILCLOSED_STAKES` | If Sakshi is unreachable, block calls at or above this stakes; below, forward. Unset means always fail-open |
+    | `SAKSHI_MCP_EXEMPT_TOOLS` | Read-only tools to forward without evaluation |
+    | `SAKSHI_MCP_STAKES_FIELDS` | Argument keys the proxy reads stakes from |
+    | `SAKSHI_MCP_BLOCK_STYLE` | `result` (structured tool error, default) or `error` (JSON-RPC error) |
+
+    <Warning>
+      Fail-static is deliberate and configurable. With `SAKSHI_MCP_ENFORCE=on`
+      but no `SAKSHI_MCP_FAILCLOSED_STAKES`, an unreachable Sakshi fails open and
+      forwards. Set the threshold so high-stakes calls block rather than slip
+      through when governance is down.
+    </Warning>
+  </Step>
+</Steps>
+
+<Tip>
+  Already using the Python SDK? `from sakshi.middleware import watch_mcp` wraps
+  an MCP client session so its tool discovery and calls are witnessed on the
+  active decision, including the same tool-poisoning detection, with no separate
+  process.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="MCP SDK" icon="server" href="/sdk/mcp">
+    The server and proxy in full: every tool, flag, and transport.
+  </Card>
+  <Card title="MCP integration" icon="plug" href="/integrations/mcp">
+    The `watch_mcp` middleware for SDK-instrumented agents.
+  </Card>
+  <Card title="The decision chain" icon="link" href="/concepts/decision-chain">
+    Where witnessed tool calls and poisoning findings are recorded.
+  </Card>
+  <Card title="Bound autonomy" icon="shield-halved" href="/guides/bound-autonomy">
+    The envelope the proxy enforces against in the tool path.
+  </Card>
+</CardGroup>

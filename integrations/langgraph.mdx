@@ -1,0 +1,93 @@
+---
+title: LangGraph
+description: "Witness graph-structured agents: bracket a compiled LangGraph and record individual nodes, with no dependency on LangGraph."
+---
+
+LangGraph agents are graphs of nodes. Sakshi witnesses them at two levels, and
+neither imports `langgraph`. `watch_langgraph` brackets a whole run.
+`witness_node` records a single node. Combine them with a provider middleware, and
+the model calls inside each node are recorded as `llm_call` steps in order, nested
+under the graph and node steps.
+
+## Install
+
+```bash
+pip install sakshi-sdk langgraph
+```
+
+## Bracket a compiled graph
+
+`watch_langgraph` wraps a compiled graph's `invoke` and `stream` so each run is
+bracketed by `graph_start` and `graph_end` steps, with latency and, for streams,
+the chunk count.
+
+<CodeGroup>
+
+```python Before
+graph = builder.compile()
+
+result = graph.invoke({"application": application})
+```
+
+```python After
+from sakshi.middleware import watch_langgraph
+
+graph = watch_langgraph(builder.compile())
+
+with sakshi.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    result = graph.invoke({"application": application})
+    decision.action(outcome="approved", mode="auto")
+```
+
+</CodeGroup>
+
+The optional `name` labels the graph in the evidence. If you do not pass it, the
+graph's own name or its type name is used.
+
+```python
+graph = watch_langgraph(builder.compile(), name="loan-decision-graph")
+```
+
+## Witness individual nodes
+
+`witness_node` wraps a node callable so each execution lands a `graph_node` step:
+the node name, the latency, which state keys the node updated, and the error if it
+raised. Failures are evidence too, so the exception is re-raised after it is
+recorded. The state values themselves are not captured, only the keys.
+
+```python
+from sakshi.middleware import witness_node
+
+def assess(state):
+    ...
+    return {"risk_band": "low", "score": 0.92}
+
+# Bare, wrapping an existing callable:
+builder.add_node("assess", witness_node(assess))
+
+# Or as a decorator, with an optional name override:
+@witness_node(name="assess")
+def assess(state):
+    ...
+```
+
+Both the sync and async node signatures are supported, including the `state` and
+`state, config` forms.
+
+## Combine with a provider middleware
+
+The graph and node steps describe the control flow. To also record the model
+calls, wrap the provider client that your nodes use with the matching middleware,
+for example [OpenAI](/integrations/openai) or [Anthropic](/integrations/anthropic).
+Because every step attaches to the same active witness session, the `llm_call`
+steps land in order under the node that made them.
+
+<Note>
+  Recording is fail-open across all three surfaces: a problem writing a graph,
+  node, or model step never breaks the run. With no active witness session, calls
+  pass through untouched.
+</Note>
+
+<Card title="Full SDK reference" icon="code" href="/sdk/python">
+  The client, the witness session, and enforcement.
+</Card>

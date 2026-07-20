@@ -1,0 +1,70 @@
+---
+title: Evidence packs
+description: "Vidhi: regulator instruments encoded as data, scored against your live evidence to produce a readiness score and a signed, exportable pack you could hand an examiner."
+---
+
+An examiner does not ask for your logs. They ask whether you meet a specific
+obligation, clause by clause. The Vidhi capability (vidhi, "law") closes that gap
+by encoding the instrument itself as data and scoring it against the evidence you
+are already producing.
+
+## Instruments as data
+
+Each regulatory instrument is a clause map: the obligations broken out one by
+one, with each clause bound to the kind of live evidence that would satisfy it.
+Sakshi ships maps for RBI Model Risk Management, DPDP, SEBI Regulation 16C, and
+IRDAI. A clause is scored **ready** only when the backing evidence check passes
+against real records on the [chain](/concepts/decision-chain), never on a
+self-assertion.
+
+Because the instrument is data, adding a regulator is a new map, not a new
+release.
+
+## Readiness, then a pack
+
+Two things come out of a clause map. First, a readiness score: what fraction of
+the obligations are met by live evidence right now, which doubles as a
+gap-ordered work list. Second, an evidence pack: the clauses, the evidence
+behind each, and a scoped [chain](/concepts/decision-chain) verification, bundled
+and Ed25519-signed over its exact bytes so it stands on its own once exported.
+
+<CodeGroup>
+
+```bash Readiness
+curl -H "Authorization: Bearer sks_..." \
+  https://sakshi.your-company.internal/api/v1/vidhi/readiness
+```
+
+```bash Export a signed pack
+curl -H "Authorization: Bearer sks_..." \
+  "https://sakshi.your-company.internal/api/v1/vidhi/packs/rbi-mrm-draft-2026/export"
+```
+
+</CodeGroup>
+
+The pack lives at `GET /api/v1/vidhi/packs/{map_name}`, its signed export at
+`.../export`, and readiness across all instruments at
+`GET /api/v1/vidhi/readiness`.
+
+## Beyond the standing maps
+
+Vidhi also assembles instruments a regulator or a citizen asks for on demand: an
+RTI decision pack that answers pointed questions about one automated decision,
+each point citing its source, and a DPDP DPIA plus a signed audit bundle for an
+independent auditor. Every one is built from the same live evidence and verified
+at export time.
+
+<Note>
+  A readiness score below 100 is not a failure to hide. A deliberately unmet
+  clause is a known gap you can point to, which is what an honest control
+  environment looks like.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Generate an evidence pack" icon="gavel" href="/guides/evidence-packs">
+    Map live records to RBI, DPDP, SEBI, or IRDAI and export a signed bundle.
+  </Card>
+  <Card title="Vidhi API" icon="terminal" href="/api-reference/introduction">
+    Packs, export, and readiness endpoints.
+  </Card>
+</CardGroup>

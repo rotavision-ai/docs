@@ -1,0 +1,83 @@
+---
+title: Google Gemini
+description: "Witness Google Gemini generate_content calls with one line, with no dependency on the google-genai SDK."
+---
+
+`watch_gemini` wraps any client that exposes `models.generate_content`, the
+google-genai SDK shape. It is duck-typed, so the Sakshi SDK does not depend on the
+`google-genai` package: it wraps the client you already hold.
+
+## Install
+
+```bash
+pip install sakshi-sdk google-genai
+```
+
+## Wrap the client
+
+<CodeGroup>
+
+```python Before
+from google import genai
+
+client = genai.Client()
+
+reply = client.models.generate_content(
+    model="gemini-2.5-pro",
+    contents="Assess this applicant.",
+)
+```
+
+```python After
+from google import genai
+from sakshi.middleware import watch_gemini
+
+client = watch_gemini(genai.Client())
+
+with sakshi.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    reply = client.models.generate_content(
+        model="gemini-2.5-pro",
+        contents="Assess this applicant.",
+    )
+    decision.action(outcome="approved", mode="auto")
+```
+
+</CodeGroup>
+
+See [the shared shape](/integrations/overview#the-shared-shape) for how `sakshi`
+and `agent_id` are created.
+
+## What gets recorded
+
+Each generation inside a witness session lands an `llm_call` step, and the served
+model identity auto-fills (para-56):
+
+- The provider, recorded as `google-gemini`.
+- `model_requested` versus `model_served`, taken from the response `model_version`,
+  so a silent model swap is visible.
+- Prompt and candidate token usage.
+- The call latency.
+- With content capture on, the `contents` you sent and the response text, each
+  truncated to `content_limit`.
+
+## Capture options
+
+```python
+watch_gemini(client, capture_content=True, content_limit=1000)
+```
+
+- `capture_content` defaults to `True`. Content capture is safe by design: the
+  platform tokenizes PII at ingest, before storage or hashing. Set it to `False`
+  for a minimal-capture deployment where only metadata, tokens, and identity are
+  recorded.
+- `content_limit` caps how much of the input and response is stored. The default
+  is 1000 characters.
+
+<Note>
+  A call made outside a witness session passes through untouched and is not
+  recorded. Recording is fail-open: it never breaks or delays the generation.
+</Note>
+
+<Card title="Full SDK reference" icon="code" href="/sdk/python">
+  The client, the witness session, and enforcement.
+</Card>

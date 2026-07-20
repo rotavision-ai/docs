@@ -1,0 +1,222 @@
+---
+title: MCP Governance
+description: "Govern any agent that speaks the Model Context Protocol: Sakshi as an MCP server, or a transparent proxy that witnesses and enforces every tool call."
+---
+
+Not every agent is a Python program you can add the SDK to. Many speak the
+[Model Context Protocol](https://modelcontextprotocol.io) instead: an MCP host
+(Claude Desktop, Cursor, an agent framework) launches tool servers and calls
+their tools. The `sakshi-mcp` package governs those agents two ways, neither of
+which requires touching the agent's code.
+
+```bash
+pip install sakshi-mcp
+```
+
+Both surfaces are clients of the Sakshi HTTP API, so every call rides the same
+tokenization and hash-chain path as any other ingest. Sakshi never sees a raw
+identifier here either.
+
+<CardGroup cols={2}>
+  <Card title="sakshi-mcp server" icon="server">
+    Adds three governance tools to any MCP host. Opt-in: the agent chooses to
+    call them. Evidence plus advisory enforcement.
+  </Card>
+  <Card title="sakshi-mcp-proxy" icon="shield-halved">
+    Sits transparently between the agent and its real MCP server. Witnesses
+    every tool call, and can enforce in the tool path. The agent cannot opt out.
+  </Card>
+</CardGroup>
+
+Configure the endpoint for both with two environment variables:
+`SAKSHI_API_URL` (defaults to `http://localhost:8000`) and `SAKSHI_MCP_API_KEY`,
+a Sakshi ingest key (falls back to `SAKSHI_API_KEY`).
+
+## Sakshi as an MCP server
+
+`sakshi-mcp` exposes Sakshi governance as MCP tools. Any MCP-capable host gains
+them without integrating the SDK. Because the agent chooses when to call them,
+this is opt-in: evidence plus advisory enforcement.
+
+| Tool | When the agent calls it |
+|---|---|
+| `enforce_action` | Before a consequential action (move money, change records, contact a customer). Returns `auto`, `async_review`, `sync_review`, or `block`. A kill switch or safe mode outranks the envelope. Honour `allowed`: if false, stop. |
+| `witness_decision` | After executing a consequential tool. Records it on the tamper-evident chain and returns the sequence number and record hash (the receipt). |
+| `check_readiness` | Any time. The live regulator-readiness score per instrument (RBI MRM, DPDP, SEBI, IRDAI), read-only. |
+
+Register it in an MCP host by pointing a server entry at the `sakshi-mcp`
+command:
+
+```json
+{
+  "mcpServers": {
+    "sakshi-governance": {
+      "command": "sakshi-mcp",
+      "env": {
+        "SAKSHI_API_URL": "https://sakshi.your-bank.internal",
+        "SAKSHI_MCP_API_KEY": "sks_..."
+      }
+    }
+  }
+}
+```
+
+The transport is stdio by default (how MCP hosts launch a local server). Set
+`SAKSHI_MCP_TRANSPORT=streamable-http` to serve it over HTTP instead:
+
+<CodeGroup>
+
+```bash stdio (default)
+SAKSHI_API_URL=... SAKSHI_MCP_API_KEY=sks_... sakshi-mcp
+```
+
+```bash streamable-http
+SAKSHI_MCP_TRANSPORT=streamable-http sakshi-mcp
+```
+
+</CodeGroup>
+
+<Note>
+  The server enforces before an action and witnesses after it, but only when the
+  agent calls the tools. For agents you do not control, or where opting out is
+  not acceptable, use the proxy below.
+</Note>
+
+## The interception proxy
+
+`sakshi-mcp-proxy` sits between an agent and its real MCP server and relays every
+JSON-RPC message verbatim:
+
+```
+agent  <--stdio-->  sakshi-mcp-proxy  <--stdio-->  real MCP server
+```
+
+Capability negotiation, resources, prompts, sampling, and notifications all pass
+through untouched, so the proxy is transport-faithful and future-proof. It only
+taps the messages it governs: `tools/call` (witnessed with a bounded argument
+and result preview, arguments tokenized at ingest) and `tools/list` (the tool
+manifest is hashed). Point the agent's MCP host at the proxy command instead of
+the real server:
+
+```bash
+sakshi-mcp-proxy --agent-id <agent_id> -- npx -y @modelcontextprotocol/server-filesystem /data
+```
+
+Everything after `--` is the real downstream server command.
+
+### Transparent witnessing
+
+By default the proxy is transparent: it observes and witnesses, it does not
+block. Every tool call the agent makes lands on the chain, attributed to
+`--agent-id`, with argument values tokenized so raw identifiers never reach the
+record. Witnessing is best-effort: a capture failure never breaks or delays a
+relayed message, and anything the proxy cannot parse is forwarded verbatim.
+
+### Tool-poisoning detection
+
+The proxy hashes the tool manifest per tool. A tool whose description or schema
+changes mid-session is the tool-poisoning vector: a malicious server can rewrite
+a tool's description after the agent first trusted it, to inject instructions
+(the 2025 incident class; OWASP MCP Top 10). When that happens, the proxy lands
+an `mcp_manifest_changed` finding on the chain, attributed to the specific tool.
+The poisoning becomes evidence, not a silent success.
+
+### Enforcement in the tool path
+
+Set `SAKSHI_MCP_ENFORCE=on` to route each `tools/call` through the agent's
+autonomy envelope before it reaches the tool. An auto-approved call is forwarded
+and witnessed; anything else is stopped and the agent gets a "parked for review"
+reply, never the tool. Under enforcement, a call to a tool poisoned mid-session
+is blocked outright, ahead of exemptions and the envelope.
+
+<ParamField path="SAKSHI_MCP_ENFORCE" type="on | off" default="off">
+  Enable tool-path blocking. Off is transparent observe-and-witness.
+</ParamField>
+
+<ParamField path="SAKSHI_MCP_BLOCK_POISONED" type="on | off">
+  Block calls to a tool poisoned mid-session. Defaults to on whenever
+  enforcement is on.
+</ParamField>
+
+<ParamField path="SAKSHI_MCP_EXEMPT_TOOLS" type="comma-list">
+  Tools to skip evaluation for (for example read-only tools). They are still
+  forwarded and witnessed.
+</ParamField>
+
+<ParamField path="SAKSHI_MCP_FAILCLOSED_STAKES" type="float">
+  Fail-static threshold. If Sakshi is unreachable, block calls whose stakes are
+  at or above this value; below it, forward. Unset means always fail-open on an
+  unreachable platform.
+</ParamField>
+
+<ParamField path="SAKSHI_MCP_BLOCK_STYLE" type="result | error" default="result">
+  How a blocked call is returned to the agent: a structured tool result flagged
+  `isError` with block details, or a JSON-RPC error.
+</ParamField>
+
+<ParamField path="SAKSHI_MCP_STAKES_FIELDS" type="comma-list">
+  Argument keys to read the stakes signal from (defaults include `amount`,
+  `amount_inr`, `value`, `stakes`, `sum`, `total`).
+</ParamField>
+
+<ParamField path="SAKSHI_MCP_CONFIDENCE_FIELDS" type="comma-list">
+  Argument keys to read the confidence signal from (defaults include
+  `confidence`, `conf`, `score`).
+</ParamField>
+
+### Remote downstream
+
+The downstream MCP server can be remote over streamable-http instead of a local
+subprocess. The agent still speaks stdio to the proxy:
+
+```
+agent  <--stdio-->  sakshi-mcp-proxy  <--streamable-http-->  remote MCP server
+```
+
+```bash
+sakshi-mcp-proxy --agent-id <agent_id> --http https://tools.example/mcp --header "Authorization: Bearer ..."
+```
+
+`--header` is repeatable. The governance decision is identical on both
+transports; the streamable-http path relays parsed JSON-RPC messages, so
+un-parseable agent input is dropped rather than forwarded verbatim.
+
+<Warning>
+  Enforcement fails static, not simply open or closed. On an unreachable
+  platform the outcome depends on `SAKSHI_MCP_FAILCLOSED_STAKES`: high-stakes
+  calls block, lower-stakes calls forward. Set the threshold deliberately for
+  your risk posture.
+</Warning>
+
+## Which to use
+
+<CardGroup cols={2}>
+  <Card title="Server" icon="server">
+    You control the agent or host and want governance tools it can call, or you
+    want a readiness check available to the agent. Advisory: the agent must
+    honour the outcome.
+  </Card>
+  <Card title="Proxy" icon="shield-halved">
+    You need every tool call witnessed whether the agent cooperates or not, or
+    you want hard enforcement in the tool path and tool-poisoning detection.
+  </Card>
+</CardGroup>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="MCP governance guide" icon="book" href="/guides/mcp-governance">
+    A walkthrough of proxying an agent, witnessing its tools, and enabling
+    enforcement.
+  </Card>
+  <Card title="watch_mcp middleware" icon="plug" href="/integrations/overview">
+    Instrument an in-process MCP client session from Python with the SDK
+    middleware instead.
+  </Card>
+  <Card title="Autonomy envelopes" icon="shield-halved" href="/concepts/autonomy-envelopes">
+    The policy the proxy evaluates each tool call against.
+  </Card>
+  <Card title="Python SDK" icon="code" href="/sdk/python">
+    The full client reference behind every governance decision.
+  </Card>
+</CardGroup>

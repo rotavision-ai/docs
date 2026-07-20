@@ -1,0 +1,70 @@
+---
+title: The decision chain
+description: "Every decision is a record hashed together with the hash of the record before it. Recomputing re-derives every hash, so tampering is detectable and the chain says exactly where it happened. No trust in the vendor required."
+---
+
+The Witness capability is a flight recorder for decisions. Every decision your
+agent makes becomes a record: the [registered agent](/concepts/know-your-agent),
+the model identity in effect, the [tokenized](/concepts/pii-tokenization) inputs,
+the steps taken, and the outcome. Failures are recorded too, because a failure
+is evidence.
+
+## Why hash-chained
+
+A log you can edit proves nothing. Each record is hashed together with the hash
+of the record before it, so the records form a chain. Change one field in one
+record and its hash changes, which breaks the link to every record after it.
+Recomputing the chain re-derives every hash from the raw records, so any
+tampering is not just detectable, the chain says exactly where it happened.
+
+```
+record N-1  ── hash(N-1) ──┐
+                           ▼
+record N    = { agent, model, inputs, steps, outcome, prev: hash(N-1) }
+                           │
+                     hash(N) ──▶ record N+1 ...
+```
+
+## Verify it yourself
+
+Anyone can recompute the chain. This is the point: you do not have to trust
+Rotavision, or even trust your own operators. `GET /api/v1/chain/verify` walks
+the records, recomputes, and returns whether the chain holds, how many records
+it checked, and the first sequence number where it broke, if any.
+
+<CodeGroup>
+
+```bash cURL
+curl -H "Authorization: Bearer sks_..." \
+  https://sakshi.your-company.internal/api/v1/chain/verify
+```
+
+```json Response
+{ "valid": true, "checked": 1842, "first_invalid_seq": null }
+```
+
+</CodeGroup>
+
+Tamper with a single field in any record and `valid` becomes `false`, with the
+break located precisely.
+
+## Signed evidence bundles
+
+When you export a decision or an [evidence pack](/concepts/evidence-packs), the
+bundle is Ed25519-signed over its exact bytes. A recipient checks the signature
+against your published key, so the artifact you hand an examiner is verifiable
+on its own, away from your systems, and cannot be altered without detection.
+
+<Note>
+  Signing is over the exact bytes of the bundle. Re-serializing or reformatting
+  the JSON breaks the signature by design. Ship the bytes you signed.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Witness a decision" icon="eye" href="/guides/witness-a-decision">
+    Open a witness session and record steps as they happen.
+  </Card>
+  <Card title="Chain API" icon="terminal" href="/api-reference/introduction">
+    The verify endpoint and the decision record shape.
+  </Card>
+</CardGroup>

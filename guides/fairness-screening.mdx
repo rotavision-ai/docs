@@ -1,0 +1,192 @@
+---
+title: Fairness screening
+description: "Run Vishwas declared-first fairness screens: how declared attributes flow in, the significance gate that stops false alarms, and running a pre-deploy run."
+---
+
+Vishwas screens decision outcomes for disparity without inferring anyone's
+identity. It is declared-first: it groups outcomes over attributes the applicant
+actually declared, never over a proxy guessed from name or locality. A flag
+requires both a threshold breach and statistical significance, so the screen
+does not cry wolf on sampling noise.
+
+This guide shows how declared attributes reach the screen, how to read the live
+result, and how to run a pre-deploy screen before an agent goes live.
+
+## How declared-first screening works
+
+The screen covers two declared attributes, using the enum values below
+(lowercase). Gender follows the NALSA three legal categories; caste category is
+the one applicants already declare on priority-sector and scheme lending.
+
+| Attribute | Declared values |
+|---|---|
+| `gender` | `female`, `male`, `transgender` |
+| `caste_category` | `sc`, `st`, `obc`, `general` |
+
+Per attribute, the screen computes group approval rates, the gap in percentage
+points against the largest declared group, and a disparate-impact ratio against
+that group. A group is **flagged** only when both of these hold:
+
+1. a **threshold breach**: the disparate-impact ratio is below `0.8` (the
+   four-fifths convention) *or* the approval gap is at least `5pp`; and
+2. **significance**: a two-proportion z-test gives `|z| >= 2.0`.
+
+A breach without significance is reported as "keep watching", not alarmed.
+Cohorts below the minimum of `20` decisions in the window are suppressed and
+surfaced, never silently dropped: silence and erasure are different things.
+
+<Steps>
+  <Step title="Declare attributes when you witness">
+    The screen reads from the flight recorder, so declared attributes must be on
+    the decision record. The wire contract is `context.declared`. Values outside
+    the enums are recorded as `undisclosed`, they are never imputed.
+
+    ```python
+    with client.witness(
+        agent_id,
+        client_ref="APP-2026-04471",
+        context={
+            "declared": {"gender": "female", "caste_category": "obc"},
+        },
+    ) as decision:
+        decision.step("assess", score=0.71)
+        decision.action(decision="approve")
+    ```
+
+    <Note>
+      Declared values are ordinary decision context: they are tokenized and
+      scrubbed like any other field, and the screen works over the group labels,
+      never over an individual. See
+      [PII tokenization](/concepts/pii-tokenization).
+    </Note>
+  </Step>
+
+  <Step title="Read the live screen">
+    The declared screen is computed live over the production decision stream.
+    Pass `agent_id` to scope it to one agent.
+
+    ```bash
+    curl -H "Authorization: Bearer $SAKSHI_KEY" \
+      "https://sakshi.your-company.internal/api/v1/vishwas/declared-screen?agent_id=$AGENT_ID"
+    ```
+
+    The response reports each attribute's groups with their approval rates,
+    `gap_vs_reference`, `di_ratio`, `z_score`, and a `flagged` boolean, plus the
+    suppressed cohorts and the thresholds in force.
+
+    ```json Response (excerpt)
+    {
+      "method": "declared-attribute group screen (no inference; ...)",
+      "flag": false,
+      "attributes": {
+        "caste_category": {
+          "reference_group": "general",
+          "groups": [
+            { "group": "general", "approval_rate": 0.74, "reference": true },
+            {
+              "group": "sc", "approval_rate": 0.66,
+              "gap_vs_reference": -0.08, "di_ratio": 0.892,
+              "z_score": 1.4, "flagged": false,
+              "note": "gap within sampling noise at this volume (|z| 1.4 < 2.0), keep watching, do not alarm"
+            }
+          ],
+          "suppressed": [
+            { "group": "st", "decisions": 12, "reason": "below minimum cohort (20) at this window" }
+          ],
+          "flagged_groups": [],
+          "flag": false
+        }
+      }
+    }
+    ```
+
+    A top-level `flag` of `null` means nothing was declared and the screen is
+    underpowered, which is itself worth acting on.
+  </Step>
+
+  <Step title="Run a pre-deploy screen">
+    Screen a batch of candidate decisions with declared attributes before the
+    agent is live. The stored result is a citable artifact that evidence packs
+    reference by id. This is a governance act, so it needs an OIDC JWT.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -X POST \
+      https://sakshi.your-company.internal/api/v1/vishwas/predeploy-runs \
+      -H "Authorization: Bearer $SAKSHI_GOVERNANCE_JWT" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "agent_id": "'$AGENT_ID'",
+        "label": "loan-agent candidate v3 fairness run",
+        "data_source": "holdout-2026-06 backtest extract",
+        "rows": [
+          { "declared": { "gender": "female", "caste_category": "sc" }, "approved": true },
+          { "declared": { "gender": "male", "caste_category": "general" }, "approved": false }
+        ]
+      }'
+    ```
+
+    ```python Python
+    import httpx
+
+    rows = [
+        {"declared": {"gender": g, "caste_category": c}, "approved": bool(a)}
+        for g, c, a in candidate_backtest
+    ]
+    resp = httpx.post(
+        "https://sakshi.your-company.internal/api/v1/vishwas/predeploy-runs",
+        headers={"Authorization": f"Bearer {governance_jwt}"},
+        json={
+            "agent_id": agent_id,
+            "label": "loan-agent candidate v3 fairness run",
+            "data_source": "holdout-2026-06 backtest extract",
+            "rows": rows,
+        },
+    )
+    run = resp.json()
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Read the result">
+    The pre-deploy run scores the batch with the same engine as the live screen,
+    so a flag means the same thing: a real, significant disparity, not noise.
+    Read `flag` for the overall verdict, `attributes.<name>.flagged_groups` for
+    the specific groups, and `suppressed` for cohorts that need a larger sample
+    before the run can speak to them. The `caveats` block travels inside every
+    result and should travel with any conclusion drawn from it.
+
+    <Warning>
+      A clean screen is not proof of fairness, and a flagged screen is not proof
+      of discrimination. Approval-rate parity ignores creditworthiness mix; a
+      flag is grounds for controlled analysis, not a conclusion.
+    </Warning>
+  </Step>
+</Steps>
+
+<Note>
+  The significance gate here uses a two-proportion z-test. Sakshi's model and
+  agent eval-run store applies the same "do not overclaim on thin data"
+  discipline a different way: it gates a pass on the Wilson 95% confidence
+  interval's lower bound, not the point estimate, so a strong score on a small
+  sample can still fail.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Vidhi and Vishwas" icon="scale-balanced" href="/concepts/evidence-packs">
+    Where fairness evidence feeds the regulator clause maps.
+  </Card>
+  <Card title="Generate an evidence pack" icon="gavel" href="/guides/evidence-packs">
+    Include a pre-deploy fairness run in a signed regulator bundle.
+  </Card>
+  <Card title="Witness a decision" icon="eye" href="/guides/witness-a-decision">
+    How declared attributes reach the flight recorder.
+  </Card>
+  <Card title="API reference" icon="terminal" href="/api-reference/introduction">
+    The full Vishwas endpoint surface.
+  </Card>
+</CardGroup>

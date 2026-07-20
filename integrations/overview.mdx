@@ -1,85 +1,146 @@
 ---
 title: Integrations Overview
-description: "Connect Rotavision with your infrastructure"
+description: "Wrap your provider client with a Sakshi middleware, add one line, and every model call your agent makes lands on the same tamper-evident chain."
 ---
 
-## Overview
+Sakshi witnesses the AI agents you already run. You do not rewrite the agent. You
+wrap the client it calls, and every model call is recorded on the chain, with the
+served model identity, tokenized inputs, and outcome. Sakshi never sees a raw
+identifier: PII is tokenized at ingest, before anything is stored or hashed.
 
-Rotavision integrates with popular cloud providers, ML platforms, and enterprise systems.
+## The integration doctrine
 
-<CardGroup cols={2}>
-  <Card title="AWS" icon="aws" href="/integrations/aws">
-    S3, SageMaker, Bedrock
+There are three ways in, and every one lands on the same chain.
+
+<CardGroup cols={3}>
+  <Card title="SDK" icon="code" href="/sdk/python">
+    A few lines. You open a witness session and record the steps of a decision
+    yourself. Full control over what becomes evidence.
   </Card>
-  <Card title="Azure" icon="microsoft" href="/integrations/azure">
-    Blob Storage, Azure ML, OpenAI
+  <Card title="Middleware" icon="plug" href="/integrations/openai">
+    One line. Wrap the provider client once and every model call inside a witness
+    session is recorded automatically, with no rewrite of the agent.
   </Card>
-  <Card title="Google Cloud" icon="google" href="/integrations/gcp">
-    GCS, Vertex AI, Gemini
-  </Card>
-  <Card title="LangChain" icon="link" href="/integrations/langchain">
-    LangChain integration
-  </Card>
-  <Card title="LlamaIndex" icon="link" href="/integrations/llamaindex">
-    LlamaIndex integration
+  <Card title="MCP" icon="server" href="/sdk/mcp">
+    Govern any agent that speaks the Model Context Protocol, including agents you
+    cannot instrument, through a client session wrapper or a proxy.
   </Card>
 </CardGroup>
 
-## Integration Types
+The middlewares are the shortest path. They are duck-typed, so the Sakshi SDK
+carries no dependency on any provider SDK: a middleware wraps any object with the
+right shape, attaches to the active witness session, and auto-fills the served
+model identity from the provider's response (the RBI draft para-56 evidence, per
+decision).
 
-### Data Sources
+## Supported providers
 
-Connect your data for analysis:
-- Cloud storage (S3, GCS, Azure Blob)
-- Data warehouses (Snowflake, BigQuery, Redshift)
-- Feature stores (Feast, Tecton)
+<CardGroup cols={2}>
+  <Card title="OpenAI and OpenAI-compatible" icon="robot" href="/integrations/openai">
+    The OpenAI client, plus Ollama, vLLM, TGI, and LM Studio through a base URL.
+    The sovereign, self-hosted path.
+  </Card>
+  <Card title="Anthropic" icon="comment" href="/integrations/anthropic">
+    The Anthropic Messages API shape.
+  </Card>
+  <Card title="Google Gemini" icon="google" href="/integrations/gemini">
+    The google-genai SDK shape.
+  </Card>
+  <Card title="AWS Bedrock" icon="aws" href="/integrations/bedrock">
+    The bedrock-runtime Converse API. Residency-compliant in AWS Mumbai.
+  </Card>
+  <Card title="LangChain" icon="link" href="/integrations/langchain">
+    The same provider middlewares underneath, plus the LangGraph path for graph
+    apps.
+  </Card>
+  <Card title="LangGraph" icon="diagram-project" href="/integrations/langgraph">
+    Bracket a compiled graph and witness individual nodes.
+  </Card>
+</CardGroup>
 
-### ML Platforms
+| Runtime | Function | Wraps |
+| --- | --- | --- |
+| OpenAI, Ollama, vLLM, TGI, LM Studio | `watch_openai_compatible` | `chat.completions.create` |
+| Anthropic | `watch_anthropic` | `messages.create` |
+| Google Gemini | `watch_gemini` | `models.generate_content` |
+| AWS Bedrock | `watch_bedrock` | `converse` |
+| LangGraph | `watch_langgraph`, `witness_node` | a compiled graph, a node callable |
+| MCP | `watch_mcp` | an MCP client session |
 
-Monitor models across platforms:
-- AWS SageMaker
-- Azure ML
-- Google Vertex AI
-- MLflow
-- Kubeflow
-
-### LLM Frameworks
-
-Add trust & monitoring to LLM apps:
-- LangChain
-- LlamaIndex
-- Haystack
-
-### Notifications
-
-Alert routing:
-- Slack
-- PagerDuty
-- Email
-- Custom webhooks
-
-## Quick Setup
-
-Most integrations follow this pattern:
+Every function lives in `sakshi.middleware`:
 
 ```python
-from rotavision import Rotavision
-from rotavision.integrations import AWSIntegration
-
-client = Rotavision()
-
-# Configure integration
-aws = AWSIntegration(
-    access_key_id="...",
-    secret_access_key="...",
-    region="ap-south-1"
-)
-
-# Use with Rotavision
-result = client.vishwas.analyze(
-    model_id="my-model",
-    dataset={
-        "data_url": "s3://my-bucket/data.parquet"  # Direct S3 access
-    }
+from sakshi.middleware import (
+    watch_openai_compatible,
+    watch_anthropic,
+    watch_gemini,
+    watch_bedrock,
+    watch_langgraph,
+    witness_node,
+    watch_mcp,
 )
 ```
+
+## The shared shape
+
+Every integration follows the same four steps: point the SDK at your deployment,
+register the agent, wrap the provider client once, then make calls inside a
+witness session.
+
+```python
+from sakshi import SakshiClient
+from sakshi.middleware import watch_openai_compatible
+from openai import OpenAI
+
+# 1. Point the SDK at your Sakshi deployment.
+sakshi = SakshiClient(
+    base_url="https://sakshi.your-company.internal",
+    api_key="sks_...",
+)
+
+# 2. Register the agent. Idempotent by name, so safe on every startup.
+agent_id = sakshi.register(
+    "loan-decision-agent",
+    owner_name="Priya Sharma",
+    owner_email="priya@your-company.com",
+    autonomy_tier="L1",
+)
+
+# 3. Wrap the provider client once. This is the one line.
+llm = watch_openai_compatible(OpenAI())
+
+# 4. Calls made inside a witness session are recorded automatically.
+with sakshi.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    reply = llm.chat.completions.create(
+        model="gpt-5.2",
+        messages=[{"role": "user", "content": "Assess this applicant."}],
+    )
+    decision.action(outcome="approved", amount=1_500_000, mode="auto")
+```
+
+You do not pass the model to `witness` when a middleware is in play. The
+middleware fills the served model identity from the provider's response, so the
+record reflects what actually answered, not what you intended to call.
+
+<Note>
+  Evidence belongs to decisions. A model call made outside a witness session
+  passes through untouched and is not recorded. Recording is also fail-open: a
+  problem writing evidence never breaks or delays the host agent's call.
+</Note>
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Python SDK" icon="code" href="/sdk/python">
+    The client, the witness session, enforcement, and the exception model.
+  </Card>
+  <Card title="MCP governance" icon="server" href="/sdk/mcp">
+    The MCP server and the interception proxy for zero-code governance.
+  </Card>
+  <Card title="The decision chain" icon="link" href="/concepts/decision-chain">
+    How steps become a tamper-evident record anyone can recompute.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Register, witness, and verify the chain in a few minutes.
+  </Card>
+</CardGroup>

@@ -1,0 +1,97 @@
+---
+title: SDK Overview
+description: "The Sakshi Python SDK: register agents, witness decisions on the tamper-evident chain, and bound autonomy, in a few lines or with a one-line middleware."
+---
+
+The Sakshi SDK is how a Python agent talks to the governance layer. It carries
+no provider dependencies and never sends a raw identifier: everything you pass
+is tokenized at ingest, before it is stored or hashed. Sakshi runs single-tenant
+in your environment, so the `base_url` in these examples is your own deployment.
+
+```bash
+pip install sakshi-sdk
+```
+
+The distribution is `sakshi-sdk`; the import is `sakshi`. Install the latest
+version from PyPI. Python 3.9 or newer.
+
+## Hello, witness
+
+Six lines: create the client, register the agent (idempotent by name), and
+witness one decision. The record is written to the chain when the `with` block
+exits.
+
+```python
+from sakshi import SakshiClient
+
+client = SakshiClient("https://sakshi.your-company.internal", api_key="sks_...")
+agent_id = client.register("loan-agent", owner_name="Priya Sharma", owner_email="priya@your-company.com")
+with client.witness(agent_id) as decision:
+    decision.action(outcome="approved", amount=1_500_000)
+```
+
+## Two ways to integrate
+
+Both land on the same chain. Pick per agent, or mix them in one process.
+
+<CardGroup cols={2}>
+  <Card title="Explicit witness and enforce" icon="pen-to-square">
+    Open a `witness` session and record the steps as they happen, and route
+    consequential actions through `enforce` before they run. Full control over
+    what evidence a decision carries. This is the reference API on the
+    [Python SDK](/sdk/python) page.
+  </Card>
+  <Card title="One-line middlewares" icon="plug">
+    Wrap the client you already use (OpenAI-compatible, Anthropic, Gemini,
+    Bedrock, LangGraph) with a single call. Every model call is recorded on the
+    active witness session, with the served model identity auto-filled. See
+    [Integrations](/integrations/overview).
+  </Card>
+</CardGroup>
+
+## Capture is fail-open, enforcement is fail-closed
+
+The two operations have opposite failure modes on purpose.
+
+<CardGroup cols={2}>
+  <Card title="witness: fail-open" icon="feather">
+    Decision capture buffers on a background worker. If the platform is
+    unreachable, your agent keeps running and records are dropped with a
+    warning. Governance infrastructure must never take production down. Pass
+    `fail_open=False` for synchronous capture that raises, for batch jobs where
+    losing evidence is worse than stopping.
+  </Card>
+  <Card title="enforce: fail-closed" icon="shield-halved">
+    Routing an action through its autonomy envelope fails closed. If Sakshi
+    cannot be reached, `enforce` raises rather than letting an ungoverned action
+    through. An ungoverned action is worse than a delayed one.
+  </Card>
+</CardGroup>
+
+<Note>
+  Enforcement is never auto-retried and capture is buffered, so the two paths
+  behave differently under load and outage. The [Python SDK](/sdk/python) page
+  documents the exact delivery semantics.
+</Note>
+
+## Where to go next
+
+<CardGroup cols={3}>
+  <Card title="Python SDK reference" icon="code" href="/sdk/python">
+    Every client method, the witness session, the enforcement outcomes, and the
+    exception model.
+  </Card>
+  <Card title="Middlewares" icon="plug" href="/integrations/overview">
+    Add governance to an existing OpenAI, Anthropic, Gemini, Bedrock, or
+    LangGraph agent with one line.
+  </Card>
+  <Card title="MCP governance" icon="server" href="/sdk/mcp">
+    Govern any agent that speaks the Model Context Protocol, as an MCP server or
+    a transparent proxy.
+  </Card>
+</CardGroup>
+
+<Card title="Try it against the demo" icon="flask" href="https://demo.rotavision.com">
+  Point `base_url` at `https://demo.rotavision.com` to run these examples
+  against a live, synthetic-data instance.
+</Card>

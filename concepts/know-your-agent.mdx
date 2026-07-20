@@ -1,0 +1,70 @@
+---
+title: Know Your Agent
+description: "A live registry of every agent: owner, autonomy tier, blast radius, and provenance. Sakshi verifies external signed agent identities rather than inventing its own, and nothing runs unregistered."
+---
+
+You cannot govern what you have not inventoried. Know Your Agent (the Register
+capability) is a live registry of every agent and model in production. It is the
+anchor the rest of Sakshi hangs off: a decision on the
+[chain](/concepts/decision-chain) points back to a registered agent, and an
+[autonomy envelope](/concepts/autonomy-envelopes) binds a registered agent.
+
+## What a registration holds
+
+Each agent carries the facts a risk team and an examiner both need:
+
+- **Owner.** A named person accountable for the agent, not a team alias.
+- **Autonomy tier.** `L0` is the lowest autonomy; higher tiers act more freely.
+  The tier is a declared posture that the envelope then enforces.
+- **Blast radius.** Which systems the agent can touch and how much money it can
+  move. This is the honest measure of what a failure could cost.
+- **Provenance.** The model, prompt, and tool versions in effect, so a silent
+  swap is visible after the fact.
+
+Nothing runs unregistered. `register` is synchronous and idempotent by name, so
+calling it on every startup is safe and never duplicates an agent.
+
+```python
+from sakshi import SakshiClient
+
+client = SakshiClient(base_url="https://sakshi.your-company.internal", api_key="sks_...")
+
+agent_id = client.register(
+    "loan-decision-agent",
+    owner_name="Priya Sharma",
+    owner_email="priya@your-company.com",
+    autonomy_tier="L1",
+    blast_radius={"systems": ["core-banking"], "max_amount": 2_000_000},
+    description="Approves or refers retail loan applications.",
+)
+```
+
+## Verified identity, not invented identity
+
+An agent may already carry an identity issued elsewhere: an A2A Signed Agent Card
+or a workload identity from your IdP. Sakshi verifies that identity rather than
+minting a competing one. It checks the Ed25519 signature over the card's
+canonical bytes: a genuine card is recorded as verified, and a tampered card is
+rejected. A declared identity with no proof is stored honestly marked
+unverified, because a claim is not a proof.
+
+<Note>
+  Verified identity is the third-party-vendor story a regulator asks about
+  directly. If a vendor's platform signed the agent's card, you can show you
+  verified it, not that you took the vendor's word.
+</Note>
+
+## Endpoints and next steps
+
+The registry is exposed at `POST/GET /api/v1/agents`,
+`POST /api/v1/agents/{id}/identity` for signed-identity verification, and
+`POST/GET /api/v1/agents/{id}/provenance`.
+
+<CardGroup cols={2}>
+  <Card title="Register an agent" icon="clipboard-list" href="/guides/register-an-agent">
+    The step-by-step guide, including blast radius and provenance.
+  </Card>
+  <Card title="SDK reference" icon="code" href="/sdk/python">
+    Every argument to `register` and the full client surface.
+  </Card>
+</CardGroup>

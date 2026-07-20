@@ -1,204 +1,168 @@
 ---
 title: Authentication
-description: "Secure your API requests with Rotavision API keys"
+description: "Authenticate to Sakshi with a Bearer token: an ingest API key for register and witness, or an OIDC JWT for governance and admin actions."
 ---
 
-## Get Your API Key
+Every request to Sakshi carries a Bearer token in the `Authorization` header.
+There are two kinds of token, and which one you need depends on what you are
+doing:
 
-<Card title="Get a Free API Key" icon="key" href="https://api.rotavision.com/docs">
-  Click "Get API Key" to instantly receive a test key. No signup required.
-</Card>
+- An **ingest API key** for the write path an agent uses at runtime: register
+  itself and witness its decisions.
+- An **OIDC JWT** from your identity provider for governance and admin actions:
+  activating an agent, publishing an autonomy envelope, minting keys, editing
+  access mappings.
 
-All API requests to Rotavision require authentication using an API key.
+Sakshi is single-tenant and runs in your environment, so the base URL in every
+example is your own deployment. The public demo at `https://demo.rotavision.com`
+is read-only and exposes a single `auditor` persona.
 
-### Self-Service Registration
+## The Authorization header
 
-1. Visit [api.rotavision.com/docs](https://api.rotavision.com/docs)
-2. Click **"Get API Key"** in the top navigation
-3. Enter your email, name, and company
-4. Receive your `rv_test_*` key instantly via email
+Send the token as a Bearer credential on every call:
 
-Test keys include 100 requests/day in the sandbox environment. For production access, [contact our team](https://rotavision.com/contact).
-
-### Key Types
-
-| Type | Prefix | Usage |
-|------|--------|-------|
-| **Live** | `rv_live_` | Production environments |
-| **Test** | `rv_test_` | Development and testing |
-
-<Warning>
-  Never expose your live API keys in client-side code, public repositories, or logs. Use environment variables or a secrets manager.
-</Warning>
-
-## Authentication Methods
-
-### Bearer Token (Recommended)
-
-Include your API key in the `Authorization` header:
-
-```bash
-curl https://api.rotavision.com/v1/vishwas/analyze \
-  -H "Authorization: Bearer rv_live_abc123..." \
-  -H "Content-Type: application/json" \
-  -d '{"model_id": "my-model"}'
+```
+Authorization: Bearer <token>
 ```
 
-### Using SDKs
+Sakshi routes the token by shape: a value with dots is treated as a JWT and
+verified against your IdP; anything else is looked up as an ingest key by its
+SHA-256 hash. You do not choose a header or a scheme per token type. Send the
+one you hold.
 
-Our SDKs handle authentication automatically:
+## Ingest API keys
+
+Ingest keys are the credential your agents carry in production. They are
+**ingest-scoped**: they can register an agent and witness decisions, and nothing
+more. An ingest key cannot activate an agent, publish an envelope, or mint
+another key. Attempting a governance action with an ingest key returns `403`.
+
+### Minting a key
+
+Keys are minted in the console under **Admin → API keys**. Minting is an admin
+action, so it requires an OIDC session, not another key.
+
+<Steps>
+  <Step title="Open the console as an admin">
+    Sign in through SSO and open **Admin → API keys**.
+  </Step>
+  <Step title="Mint a key scoped to an org unit">
+    Give the key a name and the org unit it may write for. Scope is enforced at
+    agent creation, capture, and evaluation, so a key can only ever act within
+    its unit.
+  </Step>
+  <Step title="Copy the raw key once">
+    The raw key is shown **exactly once**, at mint time. Sakshi stores only its
+    SHA-256 hash, so it cannot show the value again. Copy it into your secrets
+    manager now.
+  </Step>
+</Steps>
+
+<Warning>
+  The raw key is displayed once and never again. If you lose it, revoke it and
+  mint a new one. Never commit a key to source control, paste it into logs, or
+  ship it in client-side code.
+</Warning>
+
+### Using a key with the SDK
+
+Pass the key to the client. The base URL is your deployment.
 
 <CodeGroup>
 
 ```python Python
-from rotavision import Rotavision
+from sakshi import SakshiClient
 
-# Option 1: Pass directly
-client = Rotavision(api_key="rv_live_...")
+client = SakshiClient(
+    base_url="https://sakshi.your-company.internal",
+    api_key="sks_...",
+)
 
-# Option 2: Environment variable (recommended)
-# Set ROTAVISION_API_KEY in your environment
-client = Rotavision()
+agent_id = client.register(
+    "loan-decision-agent",
+    owner_name="Priya Sharma",
+    owner_email="priya@your-company.com",
+)
 ```
 
-```typescript Node.js
-import { Rotavision } from '@rotavision/sdk';
-
-// Option 1: Pass directly
-const client = new Rotavision({
-  apiKey: 'rv_live_...'
-});
-
-// Option 2: Environment variable (recommended)
-// Set ROTAVISION_API_KEY in your environment
-const client = new Rotavision();
-```
-
-```java Java
-import com.rotavision.Rotavision;
-
-// Option 1: Pass directly
-Rotavision client = new Rotavision("rv_live_...");
-
-// Option 2: Environment variable (recommended)
-// Set ROTAVISION_API_KEY in your environment
-Rotavision client = new Rotavision();
+```bash cURL
+curl https://sakshi.your-company.internal/api/v1/chain/verify \
+  -H "Authorization: Bearer sks_..."
 ```
 
 </CodeGroup>
 
-## API Key Scopes
-
-When creating an API key, you can restrict its permissions to specific products:
-
-| Scope | Description |
-|-------|-------------|
-| `vishwas:read` | Read fairness analyses and reports |
-| `vishwas:write` | Create new fairness analyses |
-| `guardian:read` | Read monitoring data and alerts |
-| `guardian:write` | Configure monitors and log inferences |
-| `dastavez:read` | Read extraction results |
-| `dastavez:write` | Submit documents for extraction |
-| `sankalp:proxy` | Make LLM proxy requests |
-| `orchestrate:read` | Read workflow executions |
-| `orchestrate:write` | Create and run workflows |
-| `gati:read` | Read fleet and route data |
-| `gati:write` | Submit optimization requests |
-
-### Example: Read-Only Key
-
-```json
-{
-  "name": "Analytics Dashboard",
-  "scopes": [
-    "vishwas:read",
-    "guardian:read",
-    "gati:read"
-  ]
-}
-```
-
-## Organization & Project Keys
-
-For larger teams, Rotavision supports hierarchical key management:
-
-```
-Organization (Acme Corp)
-├── Project: Production
-│   ├── Key: Backend Service (all scopes)
-│   └── Key: Analytics (read-only)
-├── Project: Staging
-│   └── Key: CI/CD Pipeline
-└── Project: Development
-    └── Key: Local Testing
-```
-
-<Info>
-  Project-scoped keys inherit organization-level rate limits but can have additional restrictions applied.
-</Info>
-
-## IP Allowlisting
-
-For enhanced security, you can restrict API keys to specific IP addresses or CIDR ranges:
-
-```json
-{
-  "name": "Production Backend",
-  "allowed_ips": [
-    "203.0.113.0/24",
-    "198.51.100.42"
-  ]
-}
-```
-
-## Key Rotation
-
-We recommend rotating API keys periodically. The dashboard supports:
-
-1. **Create new key** with the same scopes
-2. **Update your application** with the new key
-3. **Verify functionality** in production
-4. **Revoke the old key**
-
 <Tip>
-  Use a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.) to automate key rotation without application deployments.
+  Read the key from the environment rather than hard-coding it. In CI or a
+  secrets manager, expose it as `SAKSHI_API_KEY` and pass
+  `api_key=os.environ["SAKSHI_API_KEY"]`.
 </Tip>
 
-## Security Best Practices
+### Rotating and revoking
 
-<AccordionGroup>
-  <Accordion title="Use environment variables" icon="terminal">
-    Never hardcode API keys in your source code. Use environment variables or a secrets manager.
+Rotate on your own schedule, and immediately if a key may have leaked:
 
-    ```bash
-    export ROTAVISION_API_KEY=rv_live_...
-    ```
-  </Accordion>
+<Steps>
+  <Step title="Mint a replacement">
+    Create a new key with the same org-unit scope.
+  </Step>
+  <Step title="Roll it out">
+    Update your secrets manager and restart the agents that read the key.
+    `register` is idempotent by name, so restarts do not create duplicate
+    agents.
+  </Step>
+  <Step title="Revoke the old key">
+    Revoke it in the console. Revocation takes effect on the next request, so
+    verify the new key is live before you revoke.
+  </Step>
+</Steps>
 
-  <Accordion title="Use minimal scopes" icon="lock">
-    Only grant the permissions your application actually needs. A monitoring dashboard doesn't need write access.
-  </Accordion>
+## OIDC JWTs for governance
 
-  <Accordion title="Separate test and live keys" icon="flask">
-    Use `rv_test_` keys in development and CI/CD. Never use live keys in non-production environments.
-  </Accordion>
+Registering and witnessing is deliberately the only thing an ingest key can do.
+The decisions that shape governance, who owns an agent, what its autonomy
+envelope permits, who may approve a parked action, are gated behind a person
+authenticated by your identity provider.
 
-  <Accordion title="Monitor key usage" icon="chart-line">
-    Review API key usage in your dashboard. Investigate unexpected patterns or unauthorized access attempts.
-  </Accordion>
+For those actions, obtain a JWT from your IdP through the console SSO flow and
+send it as the Bearer token. The token carries the caller's identity, roles, and
+team claims, which Sakshi resolves into a Sakshi role and org unit through the
+access mapping (see the `access` and `me` endpoints in the
+[API reference](/api-reference/introduction)). Governance and admin endpoints
+require a valid JWT; an ingest key on the same route returns `403`.
 
-  <Accordion title="Enable IP allowlisting" icon="shield">
-    For production keys, restrict access to known IP addresses of your servers.
-  </Accordion>
-</AccordionGroup>
+Actions that need a JWT include:
 
-## Rate Limits by Key Type
+- Activating, suspending, or transferring ownership of an agent
+- Publishing or linting an autonomy envelope, setting a response policy, arming
+  circuit breakers
+- Activating or releasing the kill switch, attesting a drill
+- Claiming and resolving review-queue items
+- Minting or revoking ingest keys and webhooks
+- Editing the access mapping under Admin
 
-| Key Type | Requests/min | Requests/day | Access |
-|----------|--------------|--------------|--------|
-| Test (Self-Service) | 10 | 100 | [Get instantly](https://api.rotavision.com/docs) |
-| Live (Starter) | 600 | 50,000 | [Contact sales](https://rotavision.com/contact) |
-| Live (Growth) | 3,000 | 500,000 | [Contact sales](https://rotavision.com/contact) |
-| Live (Enterprise) | Custom | Custom | [Contact sales](https://rotavision.com/contact) |
+## The public demo
 
-See [Rate Limits](/concepts/rate-limits) for detailed information.
+The hosted demo at `https://demo.rotavision.com` is read-only and synthetic. It
+exposes a single `auditor` persona, which can read the registry, recompute the
+chain, and pull evidence, but cannot write. Use it to explore the API surface
+and the evidence model. Point the SDK at your own deployment when you are ready
+to write records.
+
+## What to read next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install the SDK, register an agent, and witness a decision with a key.
+  </Card>
+  <Card title="Errors" icon="triangle-exclamation" href="/errors">
+    The exception model, fail-open capture versus fail-closed enforcement, and
+    the HTTP status codes.
+  </Card>
+  <Card title="Python SDK" icon="code" href="/sdk/python">
+    Every client method, the witness session, and the exception types.
+  </Card>
+  <Card title="API reference" icon="terminal" href="/api-reference/introduction">
+    Every endpoint, generated from the live OpenAPI spec.
+  </Card>
+</CardGroup>

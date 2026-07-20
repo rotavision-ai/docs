@@ -1,0 +1,111 @@
+---
+title: OpenAI and OpenAI-compatible
+description: "Witness OpenAI and any OpenAI-compatible runtime, including self-hosted Ollama, vLLM, TGI, and LM Studio, with one line."
+---
+
+`watch_openai_compatible` wraps any client that exposes `chat.completions.create`.
+That is the official OpenAI client, and it is also the sovereignty path: point a
+client at a base URL and the same wrapper witnesses Ollama, vLLM, TGI, or LM Studio
+running inside your own environment. One integration covers every runtime that
+speaks the OpenAI API.
+
+## Install
+
+```bash
+pip install sakshi-sdk openai
+```
+
+## Wrap the client
+
+The change is one line: wrap the client you already build. Everything downstream
+keeps calling it the same way.
+
+<CodeGroup>
+
+```python Before
+from openai import OpenAI
+
+client = OpenAI()
+
+reply = client.chat.completions.create(
+    model="gpt-5.2",
+    messages=[{"role": "user", "content": "Assess this applicant."}],
+)
+```
+
+```python After
+from openai import OpenAI
+from sakshi.middleware import watch_openai_compatible
+
+client = watch_openai_compatible(OpenAI())
+
+with sakshi.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    reply = client.chat.completions.create(
+        model="gpt-5.2",
+        messages=[{"role": "user", "content": "Assess this applicant."}],
+    )
+    decision.action(outcome="approved", mode="auto")
+```
+
+</CodeGroup>
+
+See [the shared shape](/integrations/overview#the-shared-shape) for how `sakshi`
+and `agent_id` are created.
+
+## Self-hosted and sovereign runtimes
+
+The provider is derived from the client's base URL. A call to `openai.com` records
+as `openai`. A call to `localhost`, a private address, or a bare service hostname
+records as `self-hosted (host)`, so the evidence reflects that the model never left
+your network.
+
+```python
+from openai import OpenAI
+from sakshi.middleware import watch_openai_compatible
+
+# An Ollama server on the same host, or a vLLM service in the cluster.
+local = watch_openai_compatible(
+    OpenAI(base_url="http://ollama:11434/v1", api_key="ollama")
+)
+
+with sakshi.witness(agent_id) as decision:
+    reply = local.chat.completions.create(
+        model="qwen2.5:1.5b",
+        messages=[{"role": "user", "content": "Assess this applicant."}],
+    )
+```
+
+## What gets recorded
+
+Each completion inside a witness session lands an `llm_call` step, and the served
+model identity auto-fills (para-56):
+
+- The provider, derived from the base URL as above.
+- `model_requested` versus `model_served`, so a silent model swap is visible.
+- `system_fingerprint` when the provider returns one.
+- Prompt and completion token usage.
+- The finish reason and the call latency.
+- With content capture on, the last message you sent and the response text, each
+  truncated to `content_limit`.
+
+## Capture options
+
+```python
+watch_openai_compatible(client, capture_content=True, content_limit=1000)
+```
+
+- `capture_content` defaults to `True`. Content capture is safe by design: the
+  platform tokenizes PII at ingest, before storage or hashing. Set it to `False`
+  for a minimal-capture deployment where only metadata, tokens, and identity are
+  recorded.
+- `content_limit` caps how much of each message and response is stored. The
+  default is 1000 characters.
+
+<Note>
+  A call made outside a witness session passes through untouched and is not
+  recorded. Recording is fail-open: it never breaks or delays the completion.
+</Note>
+
+<Card title="Full SDK reference" icon="code" href="/sdk/python">
+  The client, the witness session, and enforcement.
+</Card>

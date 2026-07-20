@@ -1,0 +1,62 @@
+---
+title: The kill switch
+description: "A per-agent halt or safe mode. safe_mode swaps evaluation to a conservative envelope and parks actions in review instead of blocking. Drilled on a schedule with signed attestations, and checked on every enforcement call."
+---
+
+When an agent goes wrong, you need to stop it now, not after the next deploy. The
+kill switch is a per-agent control that takes an agent out of autonomous
+operation immediately. It is part of the Bound capability and works alongside
+[autonomy envelopes](/concepts/autonomy-envelopes) and circuit breakers.
+
+## Two rungs: halt and safe mode
+
+The response is per-agent policy, frozen at the moment of activation:
+
+- **`halt`** stops the agent outright. Every enforcement decision refuses.
+- **`safe_mode`** does not hard-stop. It swaps the agent's evaluation to a
+  conservative envelope and parks actions in review instead of blocking them, so
+  the agent degrades to human-supervised operation rather than going dark. This
+  suits an agent whose blast radius makes a full stop its own kind of incident.
+
+Circuit breakers (rising override rate, evaluation-volume spikes, model drift)
+fire this same path automatically. Breakers halt without a human; release is
+human-only, with an attestation.
+
+## Checked on every action, fails closed
+
+The SDK's `enforce()` consults the kill switch before it evaluates anything. A
+background poller caches each agent's kill state, so a halt takes effect within
+one poll interval even between decisions, and the server re-checks inside the
+evaluation. Both checks fail closed: an unreachable platform, or a missing
+response field from an older deployment, reads as `halt`, never as permissive.
+
+```python
+from sakshi import SakshiBlocked
+
+try:
+    client.enforce(agent_id, "approve_loan", stakes=1_500_000, confidence=0.92)
+except SakshiBlocked:
+    # halted by the kill switch, or blocked by a rule: stop the agent
+    ...
+```
+
+## Drilled, not just declared
+
+A safety control you have never fired is a hope, not a control. Kill switches are
+drilled on a schedule, and each drill produces a signed attestation recording the
+propagation time and the scope it reached. That attestation is evidence you
+tested the switch, cited by the [evidence packs](/concepts/evidence-packs) that
+map to regulator obligations.
+
+Activate at `POST /api/v1/bound/kill`, check state at
+`GET /api/v1/bound/kill/status`, and release (human-only) at
+`.../kill/release`.
+
+<CardGroup cols={2}>
+  <Card title="Bound autonomy" icon="shield-halved" href="/guides/bound-autonomy">
+    Set the response policy, arm circuit breakers, and run a drill.
+  </Card>
+  <Card title="Autonomy envelopes" icon="sliders" href="/concepts/autonomy-envelopes">
+    The conservative envelope safe mode routes through.
+  </Card>
+</CardGroup>

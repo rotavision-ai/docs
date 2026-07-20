@@ -1,0 +1,83 @@
+---
+title: MCP
+description: "Witness an agent's Model Context Protocol tool calls, and make tool-manifest poisoning chain-visible, with one line."
+---
+
+`watch_mcp` wraps an MCP client session so an agent's tool discovery and tool calls
+are witnessed on the active decision. It is duck-typed, so the Sakshi SDK does not
+depend on the MCP SDK. The differentiated beat: if a server rewrites a tool's
+description or schema mid-session, the change lands on the chain as a finding, so
+tool poisoning is evidence rather than a silent success.
+
+This page covers the client-side middleware. To expose Sakshi's enforce and
+witness capabilities as MCP tools, or to front a server with an intercepting
+proxy that enforces in the tool path, see [MCP governance](/sdk/mcp) and the
+[MCP governance guide](/guides/mcp-governance).
+
+## Install
+
+```bash
+pip install sakshi-sdk
+```
+
+## Wrap the session
+
+MCP sessions are async, so the wrapper's `list_tools` and `call_tool` are async and
+everything else delegates through.
+
+<CodeGroup>
+
+```python Before
+async with ClientSession(read, write) as session:
+    await session.initialize()
+    tools = await session.list_tools()
+    result = await session.call_tool("transfer_funds", {"account": "…", "amount": 5000})
+```
+
+```python After
+from sakshi.middleware import watch_mcp
+
+async with ClientSession(read, write) as inner:
+    await inner.initialize()
+    session = watch_mcp(inner, server="bank-tools")
+
+    with sakshi.witness(agent_id, client_ref="APP-2026-04471") as decision:
+        tools = await session.list_tools()
+        result = await session.call_tool(
+            "transfer_funds", {"account": "…", "amount": 5000}
+        )
+        decision.action(outcome="approved", mode="auto")
+```
+
+</CodeGroup>
+
+The optional `server` labels which MCP server the session talks to, for the
+evidence. See [the shared shape](/integrations/overview#the-shared-shape) for how
+`sakshi` and `agent_id` are created.
+
+## What gets recorded
+
+- On the first `list_tools`, an `mcp_tools` step with the tool names and a SHA-256
+  digest of the tool manifest, which is each tool's name, description, and input
+  schema.
+- On each `call_tool`, an `mcp_tool_call` step with the tool name, the argument
+  keys, the latency, the result status, and the error if the call raised. Argument
+  values are not captured here, and are tokenized at ingest in any case.
+- If a later `list_tools` returns a different manifest digest, an
+  `mcp_manifest_changed` finding, because the description or schema is the tool
+  poisoning vector (the 2025 incident class, OWASP MCP Top 10).
+
+<Note>
+  Recording is fail-open: it never breaks the host tool call, and a call raised by
+  the server is re-raised after it is recorded. With no active witness session,
+  calls pass through untouched.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="MCP governance" icon="server" href="/sdk/mcp">
+    The Sakshi MCP server and the interception proxy for zero-code governance.
+  </Card>
+  <Card title="MCP governance guide" icon="book" href="/guides/mcp-governance">
+    The server and proxy in practice, including tool-path enforcement.
+  </Card>
+</CardGroup>

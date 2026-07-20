@@ -1,0 +1,68 @@
+---
+title: Agent governance
+description: "The mental model behind Sakshi: as models become agents, the unit of governance shifts from the model to the decision. The five capabilities, and the three ways to connect."
+---
+
+Model governance asked one question: is this model fit for use? An agent asks a
+harder one, thousands of times a day: was this specific decision fit to be made,
+by this agent, with this autonomy, on this data? As models become agents, the
+unit of governance shifts from the model to the decision.
+
+Sakshi is the layer that governs at that unit. It sits beside the agents you
+already run, single-tenant, inside your own environment. It does not replace
+your models or your orchestration and it never sees a raw identifier: personal
+data is [tokenized at ingest](/concepts/pii-tokenization) before anything is
+stored.
+
+## The five capabilities
+
+Each capability owns one part of the decision, and each has its own concept page.
+
+<CardGroup cols={2}>
+  <Card title="Register" icon="clipboard-list" href="/concepts/know-your-agent">
+    Know Your Agent. A live registry: every agent has an owner, an autonomy
+    tier, a blast radius, and provenance. Nothing runs unregistered.
+  </Card>
+  <Card title="Witness" icon="link" href="/concepts/decision-chain">
+    The flight recorder. Every decision is hashed onto a tamper-evident chain
+    that anyone can recompute. No trust in the vendor required.
+  </Card>
+  <Card title="Bound" icon="shield-halved" href="/concepts/autonomy-envelopes">
+    Autonomy envelopes. Each action routes to auto, review, or block by stakes
+    and confidence, backed by circuit breakers and a drilled
+    <a href="/concepts/kill-switch"> kill switch</a>.
+  </Card>
+  <Card title="Vidhi" icon="gavel" href="/concepts/evidence-packs">
+    Evidence packs. Regulator instruments encoded as data and scored against
+    your live evidence, exported as a signed bundle you could hand an examiner.
+  </Card>
+</CardGroup>
+
+The fifth capability, Vishwas, screens for fairness declared-first and gates
+flags on statistical significance. See the
+[fairness screening guide](/guides/fairness-screening).
+
+## How you connect
+
+There are three ways in, and every one lands on the same chain.
+
+<CardGroup cols={3}>
+  <Card title="SDK" icon="code" href="/sdk/python">
+    Wrap your calls in a few lines of Python: `register`, `witness`, `enforce`.
+  </Card>
+  <Card title="Middlewares" icon="plug" href="/integrations/overview">
+    Add one line to an OpenAI, Anthropic, Gemini, Bedrock, LangChain, or
+    LangGraph agent.
+  </Card>
+  <Card title="MCP" icon="server" href="/sdk/mcp">
+    Govern any agent that speaks the Model Context Protocol, with no SDK in the
+    agent at all.
+  </Card>
+</CardGroup>
+
+<Note>
+  Sakshi is built for regulated Indian enterprises first, with clause maps for
+  RBI Model Risk Management, DPDP, SEBI, and IRDAI. Try a running instance at
+  [demo.rotavision.com](https://demo.rotavision.com), or start with the
+  [quickstart](/quickstart).
+</Note>

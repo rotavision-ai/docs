@@ -1,0 +1,206 @@
+---
+title: Bound autonomy
+description: "Publish an autonomy envelope, enforce it before an agent acts, arm circuit breakers, and drill the kill switch."
+---
+
+Witnessing records what happened. Bounding decides what is allowed to happen.
+An autonomy envelope is a set of versioned, attested rules that route each
+intended action to `auto`, `async_review`, `sync_review`, or `block` by its
+stakes, confidence, and novelty. This guide publishes an envelope, enforces it
+from the SDK, arms circuit breakers, and drills the kill switch.
+
+<Steps>
+  <Step title="Publish an autonomy envelope">
+    Publish a new envelope version for the agent. Rules are evaluated in order;
+    the first match wins, and anything unmatched falls through to
+    `default_outcome`. Publishing is a governance act, so it needs an OIDC JWT.
+
+    Every envelope is formally linted with Z3 before it governs production. The
+    lint catches dead rules and escalation non-monotonicity (a case where higher
+    stakes would route to *less* oversight). With
+    `SAKSHI_ENVELOPE_LINT_STRICT=true` a failing lint blocks the publish; by
+    default the findings are attached and attested.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -X POST \
+      https://sakshi.your-company.internal/api/v1/bound/agents/$AGENT_ID/envelope \
+      -H "Authorization: Bearer $SAKSHI_GOVERNANCE_JWT" \
+      -H "Content-Type: application/json" \
+      -d @envelope.json
+    ```
+
+    ```json envelope.json
+    {
+      "default_outcome": "sync_review",
+      "deep_review_rate": 0.1,
+      "note": "Retail loan approvals v3",
+      "rules": [
+        {
+          "name": "small-auto",
+          "when": { "actions": ["approve_loan"], "max_stakes": 500000, "min_confidence": 0.85 },
+          "outcome": "auto"
+        },
+        {
+          "name": "mid-async",
+          "when": { "actions": ["approve_loan"], "min_stakes": 500000, "max_stakes": 2000000 },
+          "outcome": "async_review"
+        },
+        {
+          "name": "jumbo-sync",
+          "when": { "actions": ["approve_loan"], "min_stakes": 2000000 },
+          "outcome": "sync_review"
+        }
+      ]
+    }
+    ```
+
+    </CodeGroup>
+
+    `deep_review_rate` is the fraction of `auto` decisions sampled for post-hoc
+    deep review, so oversight does not go dark just because an action was
+    allowed. Prior versions deactivate but are never deleted: the envelope in
+    force at any past decision stays reconstructable.
+  </Step>
+
+  <Step title="Enforce before the agent acts">
+    Route the intended action through `enforce` and let the outcome decide.
+    Enforcement fails **closed**: if Sakshi is unreachable it raises rather than
+    letting an ungoverned action through. By default a hold raises, so the happy
+    path is simply "no exception means proceed".
+
+    ```python
+    from sakshi import (
+        SakshiBlocked,
+        SakshiSyncReviewRequired,
+        SakshiEnforcementUnavailable,
+    )
+
+    try:
+        decision = client.enforce(
+            agent_id, "approve_loan", stakes=450_000, confidence=0.9
+        )
+        # decision.allowed is True; decision.outcome is "auto" or "async_review"
+        approve_loan()
+    except SakshiSyncReviewRequired as exc:
+        # a human must decide before this runs; the queue item already exists
+        park_for_human(exc.decision.matched_rule)
+    except SakshiBlocked as exc:
+        # an envelope block rule or the kill switch stopped it
+        stop(exc.decision)
+    except SakshiEnforcementUnavailable:
+        # fail-closed: do not act on an ungoverned decision
+        stop()
+    ```
+
+    Prefer to branch yourself? Pass `raise_on_hold=False` and read the decision
+    directly. `async_review` allows the action with post-hoc review;
+    `sync_review` and `block` do not.
+
+    ```python
+    decision = client.enforce(
+        agent_id, "approve_loan", stakes=3_000_000, raise_on_hold=False
+    )
+    if decision.allowed:                     # "auto" or "async_review"
+        approve_loan()
+    else:                                    # "sync_review" or "block"
+        park_for_human(decision.outcome, decision.matched_rule)
+    ```
+  </Step>
+
+  <Step title="Arm circuit breakers">
+    Breakers watch the decision stream and fire the same halt path as the kill
+    switch when a governed signal degrades. Available metrics are
+    `override_rate`, `eval_volume`, `model_change`, `error_rate`, and
+    `signal_drift`. A breaker releases human-only.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -X POST \
+      https://sakshi.your-company.internal/api/v1/bound/agents/$AGENT_ID/breakers \
+      -H "Authorization: Bearer $SAKSHI_GOVERNANCE_JWT" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "override-spike",
+        "metric": "override_rate",
+        "params": { "threshold": 0.3, "min_resolved": 20 }
+      }'
+    ```
+
+    ```text What each breaker fires on
+    override_rate  humans keep overriding the agent (disagreement is a signal)
+    eval_volume    a burst of evaluations far above the recent baseline
+    model_change   the model identity in scope silently changed
+    error_rate     the agent's own error/exception rate crossed a threshold
+    signal_drift   mean stakes drifted from baseline by z standard deviations
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Drill the kill switch">
+    The kill switch outranks every envelope. Its response is set per agent and
+    frozen on activation. `halt` blocks outright, so the next `enforce` raises
+    `SakshiBlocked`. `safe_mode` does not hard-stop; instead the evaluation
+    swaps in the conservative envelope and actions park in review, so the
+    business degrades to human-decided rather than stopping.
+
+    Drill it regularly. A `drill: true` activation exercises the whole path
+    without hiding that it was a drill.
+
+    <CodeGroup>
+
+    ```bash Activate (drill)
+    curl -X POST \
+      https://sakshi.your-company.internal/api/v1/bound/kill \
+      -H "Authorization: Bearer $SAKSHI_GOVERNANCE_JWT" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "target_type": "agent",
+        "target_id": "'$AGENT_ID'",
+        "drill": true,
+        "reason": "Quarterly kill-switch drill",
+        "response": "halt"
+      }'
+    ```
+
+    ```bash Release
+    curl -X POST \
+      https://sakshi.your-company.internal/api/v1/bound/kill/release \
+      -H "Authorization: Bearer $SAKSHI_GOVERNANCE_JWT" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "target_type": "agent",
+        "target_id": "'$AGENT_ID'",
+        "note": "Drill complete"
+      }'
+    ```
+
+    </CodeGroup>
+
+    <Warning>
+      The SDK polls kill status in the background, so a halt takes effect within
+      one poll interval even between evaluations. Enforcement reads that cached
+      state first, then re-checks server-side inside the evaluation.
+    </Warning>
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Autonomy envelopes" icon="shield-halved" href="/concepts/autonomy-envelopes">
+    How rules route actions, and why envelopes are versioned and attested.
+  </Card>
+  <Card title="The kill switch" icon="power-off" href="/concepts/kill-switch">
+    Halt versus safe mode, drills, and the response ladder.
+  </Card>
+  <Card title="Witness a decision" icon="eye" href="/guides/witness-a-decision">
+    Record the reasoning behind each governed action.
+  </Card>
+  <Card title="Python SDK" icon="code" href="/sdk/python">
+    The full enforcement API and its exception model.
+  </Card>
+</CardGroup>

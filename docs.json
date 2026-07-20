@@ -1,0 +1,136 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Sakshi Documentation",
+  "colors": {
+    "primary": "#010ED0",
+    "light": "#6B8BFF",
+    "dark": "#010ED0"
+  },
+  "favicon": "/images/favicon.png",
+  "logo": {
+    "light": "/images/logo-light.png",
+    "dark": "/images/logo-dark.png",
+    "href": "https://rotavision.com"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["introduction", "quickstart", "authentication", "errors"]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/agent-governance",
+              "concepts/know-your-agent",
+              "concepts/decision-chain",
+              "concepts/autonomy-envelopes",
+              "concepts/evidence-packs",
+              "concepts/pii-tokenization",
+              "concepts/kill-switch"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/register-an-agent",
+              "guides/witness-a-decision",
+              "guides/bound-autonomy",
+              "guides/evidence-packs",
+              "guides/fairness-screening",
+              "guides/mcp-governance"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDK",
+        "groups": [
+          {
+            "group": "SDK",
+            "pages": ["sdk/overview", "sdk/python", "sdk/mcp"]
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/openai",
+              "integrations/anthropic",
+              "integrations/gemini",
+              "integrations/bedrock",
+              "integrations/langchain",
+              "integrations/langgraph",
+              "integrations/mcp"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Documentation",
+            "pages": ["api-reference/introduction"]
+          },
+          {
+            "group": "Endpoints",
+            "openapi": "/api-reference/openapi.json"
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "icon": "github",
+          "href": "https://github.com/rotavision-ai"
+        },
+        {
+          "anchor": "PyPI",
+          "icon": "python",
+          "href": "https://pypi.org/project/sakshi-sdk/"
+        },
+        {
+          "anchor": "Blog",
+          "icon": "newspaper",
+          "href": "https://rotavision.com/blog"
+        }
+      ]
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@rotavision.com"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get a sandbox",
+      "href": "https://rotavision.com/sandbox"
+    }
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/rotavision_ai",
+      "github": "https://github.com/rotavision-ai",
+      "linkedin": "https://linkedin.com/company/rotavision"
+    }
+  },
+  "integrations": {
+    "ga4": {
+      "measurementId": "G-9SQ3VYNMMM"
+    }
+  }
+}

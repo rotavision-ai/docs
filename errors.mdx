@@ -1,241 +1,180 @@
 ---
 title: Errors
-description: "Understanding and handling Rotavision API errors"
+description: "How Sakshi fails on purpose: fail-open capture, fail-closed enforcement, the SDK exception model, HTTP status codes, and idempotency."
 ---
 
-## Error Response Format
+Sakshi governs production agents, so how it behaves when something goes wrong is
+a design decision, not an accident. Two rules run through everything below:
 
-All API errors follow a consistent JSON structure:
+- **Capture is fail-open.** Recording a decision must never take your agent
+  down. If the platform is unreachable, the record is retried and then dropped
+  with a warning, and your agent keeps running.
+- **Enforcement is fail-closed.** Asking permission to act is different. If
+  Sakshi cannot return an enforcement decision, the SDK raises rather than let
+  an ungoverned action through.
 
-```json
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "The 'model_id' field is required",
-    "type": "validation_error",
-    "param": "model_id",
-    "request_id": "req_abc123xyz"
-  }
-}
+<Note>
+  Fail-open is the default for capture. Pass `fail_open=False` to
+  `SakshiClient` for jobs where losing a record is worse than stopping, such as
+  batch pipelines. Capture then delivers synchronously and raises on failure.
+</Note>
+
+## The SDK exception model
+
+The SDK raises three exceptions, all from `enforce()`. Import them from the top
+level:
+
+```python
+from sakshi import (
+    SakshiBlocked,
+    SakshiSyncReviewRequired,
+    SakshiEnforcementUnavailable,
+)
 ```
 
-| Field | Description |
-|-------|-------------|
-| `code` | Machine-readable error code |
-| `message` | Human-readable description |
-| `type` | Error category |
-| `param` | The parameter that caused the error (if applicable) |
-| `request_id` | Unique identifier for debugging |
+| Exception | Raised when | What it means |
+|---|---|---|
+| `SakshiBlocked` | The envelope matched a **block** rule, or the **kill switch** has halted the agent | The action must not run. Stop it. |
+| `SakshiSyncReviewRequired` | The envelope routed the action to **sync review** | A human must decide before the action can run. Park it; the review item already exists server-side. |
+| `SakshiEnforcementUnavailable` | Sakshi could not be reached for a decision | Fail closed. Do not proceed as if allowed. |
 
-## HTTP Status Codes
+`enforce()` returns an `EnforcementDecision` whose `outcome` is one of `auto`,
+`async_review`, `sync_review`, or `block`. By default (`raise_on_hold=True`) a
+`block` raises `SakshiBlocked` and a `sync_review` raises
+`SakshiSyncReviewRequired`, so the allowed path is the one that returns.
 
-| Status | Description |
-|--------|-------------|
-| `200` | Success |
-| `201` | Created |
-| `400` | Bad Request - Invalid parameters |
-| `401` | Unauthorized - Invalid or missing API key |
-| `403` | Forbidden - Insufficient permissions |
-| `404` | Not Found - Resource doesn't exist |
-| `409` | Conflict - Resource already exists |
-| `422` | Unprocessable Entity - Validation failed |
-| `429` | Too Many Requests - Rate limit exceeded |
-| `500` | Internal Server Error |
-| `503` | Service Unavailable - Temporary outage |
+### Handling enforcement
 
-## Error Types
+The common shape is a `try`/`except` around the intended action:
 
-### Authentication Errors
-
-```json
-{
-  "error": {
-    "code": "invalid_api_key",
-    "message": "The API key provided is invalid or has been revoked",
-    "type": "authentication_error"
-  }
-}
-```
-
-**Common causes:**
-- API key is malformed or incorrect
-- Key has been revoked
-- Key doesn't have required scopes
-
-### Validation Errors
-
-```json
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "The 'metrics' field must contain at least one valid metric",
-    "type": "validation_error",
-    "param": "metrics"
-  }
-}
-```
-
-**Common causes:**
-- Missing required fields
-- Invalid field values or types
-- Array/object constraints violated
-
-### Rate Limit Errors
-
-```json
-{
-  "error": {
-    "code": "rate_limit_exceeded",
-    "message": "Rate limit exceeded. Retry after 30 seconds.",
-    "type": "rate_limit_error"
-  }
-}
-```
-
-The response includes headers to help you handle rate limits:
-
-```
-X-RateLimit-Limit: 600
-X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 1706780400
-Retry-After: 30
-```
-
-### Resource Errors
-
-```json
-{
-  "error": {
-    "code": "model_not_found",
-    "message": "No model found with ID 'loan-model-v3'",
-    "type": "not_found_error",
-    "param": "model_id"
-  }
-}
-```
-
-## Handling Errors in SDKs
-
-Our SDKs throw typed exceptions that you can catch and handle:
-
-<CodeGroup>
-
-```python Python
-from rotavision import Rotavision
-from rotavision.exceptions import (
-    AuthenticationError,
-    ValidationError,
-    RateLimitError,
-    NotFoundError,
-    RotavisionError
+```python
+from sakshi import (
+    SakshiBlocked,
+    SakshiSyncReviewRequired,
+    SakshiEnforcementUnavailable,
 )
 
-client = Rotavision()
-
 try:
-    result = client.vishwas.analyze(model_id="my-model", dataset=data)
-except AuthenticationError as e:
-    print(f"Check your API key: {e.message}")
-except ValidationError as e:
-    print(f"Invalid request: {e.message} (param: {e.param})")
-except RateLimitError as e:
-    print(f"Rate limited. Retry after {e.retry_after} seconds")
-except NotFoundError as e:
-    print(f"Resource not found: {e.message}")
-except RotavisionError as e:
-    print(f"API error: {e.message} (request_id: {e.request_id})")
+    client.enforce(
+        agent_id,
+        "approve_loan",
+        stakes=1_500_000,
+        confidence=0.92,
+    )
+    # auto or async_review: proceed with the action
+    approve(application)
+except SakshiSyncReviewRequired:
+    # a human must decide first; park the action, do not run it
+    park_for_review(application)
+except SakshiBlocked:
+    # an envelope rule or the kill switch stopped it
+    decline_or_defer(application)
+except SakshiEnforcementUnavailable:
+    # fail closed: no decision means no ungoverned action
+    defer(application)
 ```
 
-```typescript Node.js
-import { Rotavision } from '@rotavision/sdk';
-import {
-  AuthenticationError,
-  ValidationError,
-  RateLimitError,
-  NotFoundError,
-  RotavisionError
-} from '@rotavision/sdk/errors';
+`async_review` allows the action to run now with review after the fact, so it
+returns normally. If you would rather branch on the outcome yourself instead of
+catching exceptions, pass `raise_on_hold=False` and read the decision:
 
-const client = new Rotavision();
-
-try {
-  const result = await client.vishwas.analyze({
-    modelId: 'my-model',
-    dataset: data
-  });
-} catch (e) {
-  if (e instanceof AuthenticationError) {
-    console.log(`Check your API key: ${e.message}`);
-  } else if (e instanceof ValidationError) {
-    console.log(`Invalid request: ${e.message} (param: ${e.param})`);
-  } else if (e instanceof RateLimitError) {
-    console.log(`Rate limited. Retry after ${e.retryAfter} seconds`);
-  } else if (e instanceof NotFoundError) {
-    console.log(`Resource not found: ${e.message}`);
-  } else if (e instanceof RotavisionError) {
-    console.log(`API error: ${e.message} (request_id: ${e.requestId})`);
-  }
-}
+```python
+decision = client.enforce(
+    agent_id, "approve_loan",
+    stakes=1_500_000, confidence=0.92,
+    raise_on_hold=False,
+)
+if decision.allowed:            # auto or async_review
+    approve(application)
+else:                           # sync_review or block
+    park_for_review(application)
 ```
 
-```java Java
-import com.rotavision.Rotavision;
-import com.rotavision.exceptions.*;
+`SakshiEnforcementUnavailable` is still raised even with `raise_on_hold=False`,
+because an unreachable platform is not an outcome you can branch on. It is the
+fail-closed guarantee.
 
-Rotavision client = new Rotavision();
+### Handling capture
 
-try {
-    Vishwas.AnalyzeResult result = client.vishwas().analyze(request);
-} catch (AuthenticationException e) {
-    System.out.println("Check your API key: " + e.getMessage());
-} catch (ValidationException e) {
-    System.out.println("Invalid request: " + e.getMessage());
-} catch (RateLimitException e) {
-    System.out.println("Rate limited. Retry after " + e.getRetryAfter() + " seconds");
-} catch (NotFoundException e) {
-    System.out.println("Resource not found: " + e.getMessage());
-} catch (RotavisionException e) {
-    System.out.println("API error: " + e.getMessage());
-}
+Capture through a `witness` session does not raise in the default fail-open
+mode. The record is queued and delivered by a background worker; if delivery
+fails after retries, the record is dropped and a warning is logged to the
+`sakshi` logger. Your `with client.witness(...)` block always completes.
+
+An exception inside the witness block is recorded as the decision's outcome and
+re-raised, because failures are evidence too:
+
+```python
+with client.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    decision.step("assess", risk_band="low")
+    decision.action(outcome="approved")   # if this block raises,
+                                           # the error is captured, then re-raised
 ```
 
-</CodeGroup>
+With `fail_open=False`, capture delivers synchronously and raises the underlying
+transport error instead of dropping the record. Use it only where a lost record
+is worse than a stopped job.
 
-## Retry Strategy
+## HTTP status codes
 
-For transient errors (rate limits, 5xx errors), we recommend exponential backoff:
+If you call the API directly, or want to reason about what the SDK is reacting
+to, these are the statuses Sakshi returns.
 
-```python Python
-import time
-from rotavision import Rotavision
-from rotavision.exceptions import RateLimitError, RotavisionError
+| Status | Meaning | How to react |
+|---|---|---|
+| `401` | No token, or an invalid or revoked token | Check the `Authorization` header. Mint or refresh the credential. See [Authentication](/authentication). |
+| `403` | Valid token, insufficient scope: for example an ingest key attempting a governance action | Use an OIDC JWT for governance and admin actions. Ingest keys can only register and witness. |
+| `404` | No such resource, or not visible to this principal | Verify the id and that the token's org unit or team can see it. |
+| `409` | Conflict with current state | Re-read the resource and reconcile. Do not blindly retry. |
+| `422` | Request failed validation | Fix the payload. The body names the offending fields. |
+| `429` | Rate limit exceeded | Back off. The response carries `Retry-After` (seconds); wait that long before retrying. |
+| `5xx` | Server-side error, usually transient | Retry idempotent calls with backoff. Do not silently retry `enforce` or `handoff` (see below). |
 
-def call_with_retry(func, max_retries=3):
-    for attempt in range(max_retries):
-        try:
-            return func()
-        except RateLimitError as e:
-            if attempt == max_retries - 1:
-                raise
-            time.sleep(e.retry_after or (2 ** attempt))
-        except RotavisionError as e:
-            if e.status_code < 500 or attempt == max_retries - 1:
-                raise
-            time.sleep(2 ** attempt)
-```
+Validation errors (`422`) follow the standard schema for this API and list each
+invalid field, so you can map the failure back to a specific parameter.
 
-<Tip>
-  Our SDKs include built-in retry logic with configurable settings. Check the SDK documentation for details.
-</Tip>
+## Retries and idempotency
 
-## Debugging
+The SDK's **capture** layer retries transient failures with jittered
+exponential backoff up to `max_retries=3` (configurable on the client). A fleet
+of agents backing off in lockstep would hammer a recovering platform, so the
+backoff is jittered. After the last attempt it either drops the record
+(fail-open) or raises (fail_open=False).
 
-When contacting support, always include the `request_id` from the error response:
+Not every call is safe to retry, so not every call is retried:
 
-```
-Request ID: req_abc123xyz
-Error: rate_limit_exceeded
-Timestamp: 2026-02-01T10:30:00Z
-```
+| Call | Idempotency | Retried by the SDK |
+|---|---|---|
+| `register` | Idempotent by **name**: safe to call on every startup | Synchronous; you may retry |
+| `witness` | Idempotent by **`client_ref`**: a redelivered record does not double-count | Yes, by the capture layer |
+| `enforce` | **Not** idempotent | **No.** A failure raises `SakshiEnforcementUnavailable` |
+| `request_human_handoff` | **Not** idempotent | **No.** Synchronous and raising; a lost handoff is a compliance failure |
 
-You can also find request IDs in the `X-Request-Id` response header for successful requests.
+<Warning>
+  `enforce` and `handoff` are never retried automatically, because re-asking for
+  a decision or re-requesting a human are not free to repeat. If you retry them
+  yourself, guard the retry with your own idempotency key so you do not create
+  duplicate evaluations or duplicate review items.
+</Warning>
+
+Pass a stable `client_ref` to `witness` so a retried capture reconciles to the
+same record rather than writing a second one.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Bound autonomy" icon="shield-halved" href="/guides/bound-autonomy">
+    How envelopes route an action to auto, review, or block, and how the kill
+    switch halts an agent.
+  </Card>
+  <Card title="Python SDK" icon="code" href="/sdk/python">
+    The client, the witness session, and the full exception reference.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Ingest keys versus OIDC JWTs, and why a `403` usually means the wrong token
+    type.
+  </Card>
+  <Card title="API reference" icon="terminal" href="/api-reference/introduction">
+    Every endpoint and its response schema, generated from the OpenAPI spec.
+  </Card>
+</CardGroup>

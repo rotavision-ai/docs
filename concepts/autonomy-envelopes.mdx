@@ -1,0 +1,72 @@
+---
+title: Autonomy envelopes
+description: "Rules that route each action to auto, async review, sync review, or block based on stakes, confidence, and novelty. Envelopes are formally verified with Z3 before publish, versioned, and chain-attested."
+---
+
+An autonomy tier is a declared posture. An autonomy envelope is what enforces it.
+The Bound capability is a set of rules that decide, for each intended action,
+whether the agent may act now, may act with review to follow, must wait for a
+human, or must not act at all.
+
+## The four outcomes
+
+Every action an agent is about to take is routed by its envelope to one of four
+outcomes, based on signals like the stakes involved, the model's confidence, and
+how novel the situation is:
+
+- **`auto`** proceeds immediately.
+- **`async_review`** proceeds now, with a human reviewing after the fact.
+- **`sync_review`** parks the action until a human approves it.
+- **`block`** refuses the action outright.
+
+You ask for the decision before the agent acts. Enforcement fails **closed**: if
+Sakshi is unreachable it raises rather than letting an ungoverned action through.
+
+```python
+from sakshi import SakshiBlocked, SakshiSyncReviewRequired
+
+try:
+    client.enforce(agent_id, "approve_loan", stakes=1_500_000, confidence=0.92)
+    # allowed: proceed with the action
+except SakshiSyncReviewRequired:
+    # parked for a human before it can run
+    ...
+except SakshiBlocked:
+    # the envelope (or the kill switch) refused it
+    ...
+```
+
+## Formally verified before it governs
+
+An envelope is a policy, and policies have bugs: a rule shadowed by an earlier
+one that can never fire, or an escalation that routes higher stakes to *less*
+oversight. Before an envelope is published, Sakshi checks it with the Z3 theorem
+prover for dead rules and for escalation monotonicity. This is a proof, not a
+test pass. Your autonomy policy is formally verified before it governs
+production.
+
+Every published envelope is versioned and chain-attested, so a change to how the
+agent is bounded is itself a governed, [recorded](/concepts/decision-chain)
+event.
+
+## Circuit breakers
+
+Envelopes govern individual actions. Circuit breakers watch the aggregate and
+fire the [kill path](/concepts/kill-switch) when a pattern goes wrong: a rising
+human `override_rate` (the humans keep disagreeing with the agent), an
+`eval_volume` spike, or a `model_change` that drifts the model identity in effect
+away from the one under which the envelope was approved.
+
+<Warning>
+  Circuit breakers halt automatically but release human-only. A machine can stop
+  an agent; restarting it is a human decision with an attestation.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Bound autonomy" icon="shield-halved" href="/guides/bound-autonomy">
+    Publish an envelope, arm breakers, and lint it before it ships.
+  </Card>
+  <Card title="enforce() reference" icon="code" href="/sdk/python">
+    Signals, the decision object, and the exception model.
+  </Card>
+</CardGroup>

@@ -1,0 +1,445 @@
+---
+title: Python SDK
+description: "Full reference for the Sakshi Python SDK: SakshiClient, the witness session, enforcement outcomes, and the exception model."
+---
+
+The full public surface of the `sakshi` package. Everything here is importable
+directly:
+
+```python
+from sakshi import (
+    SakshiClient,
+    WitnessSession,
+    EnforcementDecision,
+    SakshiBlocked,
+    SakshiSyncReviewRequired,
+    SakshiEnforcementUnavailable,
+)
+```
+
+## Installation
+
+```bash
+pip install sakshi-sdk
+```
+
+The distribution is `sakshi-sdk`; the import is `sakshi`. Install the latest
+version from PyPI. Python 3.9 or newer. The only runtime dependency is `httpx`.
+
+## Client
+
+```python
+from sakshi import SakshiClient
+
+client = SakshiClient(
+    base_url="https://sakshi.your-company.internal",
+    api_key="sks_...",
+)
+```
+
+<ParamField path="base_url" type="str" required>
+  Your Sakshi deployment. Sakshi is single-tenant, so this is your own instance
+  (or `https://demo.rotavision.com` for the public demo).
+</ParamField>
+
+<ParamField path="api_key" type="str | None" default="None">
+  An ingest key or governance token, sent as a bearer token. Mint one in the
+  console under Admin, or see [Authentication](/authentication).
+</ParamField>
+
+<ParamField path="fail_open" type="bool" default="True">
+  Decision capture mode. When `True` (default), captured records go onto a
+  background queue and are delivered by a worker thread; if the platform is
+  unreachable they are dropped with a warning so the host agent is never
+  blocked. Set `False` for synchronous capture that raises on delivery failure,
+  for batch jobs where losing evidence is worse than stopping. Note that
+  `enforce` always fails closed regardless of this setting.
+</ParamField>
+
+<ParamField path="http_client" type="httpx.Client | None" default="None">
+  Supply your own configured `httpx.Client` (custom transport, proxy, mTLS,
+  timeouts). When supplied, Sakshi does not own it and will not close it. When
+  omitted, Sakshi builds one against `base_url` with a 10s timeout.
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="3">
+  Attempts per captured record before it is dropped (fail-open) or raised
+  (fail-closed), with jittered exponential backoff so a fleet of agents does not
+  hammer a recovering platform in lockstep.
+</ParamField>
+
+<ParamField path="queue_size" type="int" default="10000">
+  Bound on the in-memory capture queue. When it is full, the newest record is
+  dropped with a warning rather than blocking the agent.
+</ParamField>
+
+<ParamField path="kill_poll_interval" type="float" default="5.0">
+  Seconds between background polls of each agent's kill-switch status. A halt
+  stops the agent within one interval, even between evaluations. The poller is
+  created lazily the first time you call `enforce` for an agent.
+</ParamField>
+
+<Warning>
+  Capture is fail-open by default. Records can be silently dropped when the
+  platform is unreachable. For evidence you cannot afford to lose, use
+  `fail_open=False`, and call [`flush`](#flush-and-close) before the process
+  exits.
+</Warning>
+
+## register
+
+Register an agent and get its id back. Always synchronous: an agent must not run
+unregistered. Idempotent by name, so it is safe to call on every startup.
+
+```python
+agent_id = client.register(
+    "loan-decision-agent",
+    owner_name="Priya Sharma",
+    owner_email="priya@your-company.com",
+    autonomy_tier="L1",
+    description="Approves or refers retail loan applications.",
+    org_unit="retail-credit",
+)
+```
+
+<ParamField path="name" type="str" required>
+  Human-readable agent name. The idempotency key: a second call with the same
+  name returns the existing agent instead of creating a duplicate.
+</ParamField>
+
+<ParamField path="owner_name" type="str" required>
+  Accountable owner's name.
+</ParamField>
+
+<ParamField path="owner_email" type="str" required>
+  Accountable owner's email.
+</ParamField>
+
+<ParamField path="autonomy_tier" type="str" default="L0">
+  The agent's autonomy tier (for example `L0`, `L1`).
+</ParamField>
+
+<ParamField path="blast_radius" type="dict | None" default="None">
+  Structured description of what the agent can affect. Feeds the response-ladder
+  default when a kill switch or safe mode is armed.
+</ParamField>
+
+<ParamField path="description" type="str | None" default="None" />
+
+<ParamField path="org_unit" type="str | None" default="None">
+  Organizational unit the agent belongs to. Scopes review queues and org-unit
+  enforcement on captured records.
+</ParamField>
+
+<ResponseField name="returns" type="str">
+  The agent id. Use it for every subsequent `witness` and `enforce` call.
+</ResponseField>
+
+## witness
+
+Open a witness session as a context manager. Record the steps as they happen;
+the decision record is written to the chain when the block exits. An exception
+raised inside the block is captured as the outcome and re-raised, because
+failures are evidence too.
+
+```python
+with client.witness(
+    agent_id,
+    model={"provider": "openai", "name": "gpt-5.2", "version": "2026-05"},
+    context={"applicant_aadhaar": "XXXX-XXXX-1234"},
+    client_ref="APP-2026-04471",
+) as decision:
+    decision.step("retrieve", source="credit-bureau")
+    decision.tool("risk_model", output={"band": "low", "score": 0.92})
+    decision.human("review", who="analyst-114", note="spot check")
+    decision.action(outcome="approved", amount=1_500_000, mode="auto")
+```
+
+<ParamField path="agent_id" type="str" required>
+  The id returned by [`register`](#register).
+</ParamField>
+
+<ParamField path="context" type="dict | None" default="None">
+  Decision context. Identifiers you place here are tokenized at ingest, so raw
+  PII never lands on the chain.
+</ParamField>
+
+<ParamField path="model" type="dict | None" default="None">
+  Model identity for the decision (provider, name, version). Middlewares fill
+  this in automatically from the provider's response (RBI draft MRM para 56); a
+  value you set is not overwritten.
+</ParamField>
+
+<ParamField path="policy_state" type="dict | None" default="None">
+  Policy inputs known at the start of the decision. Refine mid-decision with
+  `decision.policy(...)`.
+</ParamField>
+
+<ParamField path="client_ref" type="str | None" default="None">
+  Your correlation reference (for example an application id). Used for idempotent
+  retries and for search in the console.
+</ParamField>
+
+<ResponseField name="returns" type="WitnessSession">
+  A context manager. The record is submitted on `__exit__`.
+</ResponseField>
+
+### WitnessSession methods
+
+Call these on the object bound in the `with` block to build the decision chain.
+
+<ParamField path="step(name, **data)" type="method">
+  Append a generic step to the decision chain. `name` is a short verb
+  (`retrieve`, `assess`); `**data` is arbitrary evidence for that step.
+</ParamField>
+
+<ParamField path="tool(name, output, **data)" type="method">
+  Record a tool invocation: the tool `name`, its `output`, and any extra
+  `**data`. Recorded as a `tool` step.
+</ParamField>
+
+<ParamField path="human(kind, who, **data)" type="method">
+  Record a human touchpoint: the `kind` of involvement, `who` was involved, and
+  any extra `**data`.
+</ParamField>
+
+<ParamField path="disclosure(channel='chat', method='banner', **data)" type="method">
+  Record that the customer was told they are interacting with AI (RBI draft MRM
+  59(ii)). Lands an `ai_disclosure` touchpoint. The touchpoint is the evidence:
+  coverage is measurable, assertion is not.
+</ParamField>
+
+<ParamField path="extraction(document_type, extracted, *, authorized=None, purpose=None, confidence=None, storage=None)" type="method">
+  Record a document-extraction act. `extracted` and `authorized` are PII
+  category names (`aadhaar`, `pan`, `name`, `address`), never values. When
+  `authorized` is given, over-extraction (categories pulled beyond the
+  authorized purpose) is computed for you. `storage` is the disposition of the
+  raw value the agent produced, for example
+  `{"vault_ref": "V-8821", "residency": "IN", "retained_raw": False}`. Sakshi
+  evidences where it went; it never holds it.
+</ParamField>
+
+<ParamField path="access(reference_key, purpose, *, authorized_purposes=None, accessor=None)" type="method">
+  Record a read of a stored, reference-keyed value. `reference_key` is the vault
+  token, never the value. When `authorized_purposes` is given, an off-purpose
+  read is flagged (DPDP purpose limitation on access). Sakshi witnesses that the
+  read happened and whether it was on-purpose; it never detokenizes the value.
+</ParamField>
+
+<ParamField path="policy(**data)" type="method">
+  Merge facts into policy state that are only known mid-decision, such as which
+  routing outcome the policy engine actually chose.
+</ParamField>
+
+<ParamField path="action(**data)" type="method">
+  Set the decision's final action (outcome, amount, mode). If the block raises
+  and no action was set, the outcome is recorded as `error` with the exception.
+</ParamField>
+
+<ParamField path="model_identity(**data)" type="method">
+  Fill or refine the decision's model identity. Middlewares call this with the
+  provider-reported model and version; a key already set is not overwritten.
+</ParamField>
+
+## enforce
+
+Route an intended action through the agent's autonomy envelope before it runs.
+Enforcement fails closed: an unreachable platform raises rather than letting an
+ungoverned action through. The kill switch is consulted from the local poller
+cache first, then re-checked server-side inside the evaluation.
+
+```python
+from sakshi import (
+    SakshiBlocked,
+    SakshiSyncReviewRequired,
+    SakshiEnforcementUnavailable,
+)
+
+try:
+    decision = client.enforce(
+        agent_id,
+        "approve_loan",
+        stakes=1_500_000,
+        confidence=0.92,
+    )
+    # decision.allowed is True here: proceed with the action
+except SakshiSyncReviewRequired as e:
+    # parked for a human before it can run; e.decision has the details
+    ...
+except SakshiBlocked as e:
+    # the envelope, a block rule, or the kill switch stopped it
+    ...
+except SakshiEnforcementUnavailable:
+    # platform unreachable; enforcement fails closed, so do not act
+    ...
+```
+
+<ParamField path="agent_id" type="str" required />
+
+<ParamField path="action" type="str" required>
+  Short verb for the intended action, for example `approve_loan` or
+  `transfer_funds`.
+</ParamField>
+
+<ParamField path="stakes" type="float | None" default="None">
+  Magnitude of the action (for example an amount in INR). Signals are
+  non-negative and unbounded; they are not confined to 0..1.
+</ParamField>
+
+<ParamField path="confidence" type="float | None" default="None">
+  The agent's confidence, 0..1.
+</ParamField>
+
+<ParamField path="novelty" type="float | None" default="None">
+  How novel the situation is, 0..1.
+</ParamField>
+
+<ParamField path="client_ref" type="str | None" default="None">
+  Your correlation reference for the evaluation.
+</ParamField>
+
+<ParamField path="raise_on_hold" type="bool" default="True">
+  When `True` (default), a `block` outcome raises `SakshiBlocked` and a
+  `sync_review` outcome raises `SakshiSyncReviewRequired`. Set `False` to get the
+  `EnforcementDecision` back for every outcome and branch on it yourself.
+</ParamField>
+
+### Outcomes
+
+`enforce` returns an `EnforcementDecision` (a frozen dataclass):
+
+<ResponseField name="outcome" type="str">
+  One of `auto`, `async_review`, `sync_review`, `block`.
+</ResponseField>
+
+<ResponseField name="allowed" type="bool">
+  Whether the agent may act now. `True` for `auto` and `async_review` (the
+  latter allows the action with post-hoc review); `False` for `sync_review` and
+  `block`.
+</ResponseField>
+
+<ResponseField name="matched_rule" type="str | None">
+  The envelope rule that decided the outcome, if any.
+</ResponseField>
+
+<ResponseField name="envelope_version" type="int | None">
+  The version of the autonomy envelope that was evaluated.
+</ResponseField>
+
+<ResponseField name="evaluation_id" type="str | None">
+  Server-side id for this evaluation, for correlation and review lookup.
+</ResponseField>
+
+With `raise_on_hold=False`, branch on the decision directly:
+
+```python
+decision = client.enforce(agent_id, "approve_loan", stakes=1_500_000, raise_on_hold=False)
+if decision.allowed:
+    ...  # auto or async_review: act now
+elif decision.outcome == "sync_review":
+    ...  # park for a human before acting
+else:  # block
+    ...  # do not act
+```
+
+### Exceptions
+
+<ResponseField name="SakshiBlocked" type="Exception">
+  The platform refused the action: a kill switch is active, or a block-outcome
+  rule matched. This must stop the host agent. Carries an optional `.decision`.
+</ResponseField>
+
+<ResponseField name="SakshiSyncReviewRequired" type="Exception">
+  The action needs a human decision before it executes. The review queue item
+  already exists server-side; the host agent must park the action. Carries
+  `.decision`.
+</ResponseField>
+
+<ResponseField name="SakshiEnforcementUnavailable" type="Exception">
+  The platform could not be reached for a decision. Unlike capture (fail-open),
+  enforcement fails closed, so this is raised rather than defaulting to allow.
+</ResponseField>
+
+<Note>
+  `enforce` is never retried automatically. A single evaluation either returns a
+  decision or fails closed. Contrast with capture, which is buffered and
+  retried.
+</Note>
+
+## request_human_handoff
+
+The customer asked for a human (RBI draft MRM 59(iii)). Synchronous and raising:
+a lost handoff request is a compliance failure, so this never buffers or drops.
+
+```python
+result = client.request_human_handoff(
+    agent_id,
+    client_ref="APP-2026-04471",
+    reason="customer requested a human agent",
+)
+```
+
+<ParamField path="agent_id" type="str" required />
+<ParamField path="client_ref" type="str | None" default="None" />
+<ParamField path="reason" type="str | None" default="None" />
+
+<ResponseField name="returns" type="dict">
+  The server response for the parked handoff (a `handoff` review-queue item).
+</ResponseField>
+
+## flush and close
+
+<ParamField path="flush(timeout=10.0)" type="method">
+  Block until every queued capture record has been delivered or dropped. Call it
+  before a batch job exits, or before a short-lived process ends, to be sure
+  buffered evidence has left the queue.
+</ParamField>
+
+<ParamField path="close()" type="method">
+  Stop the kill-switch pollers, flush the capture queue, join the worker, and
+  close the HTTP client if Sakshi owns it. When `fail_open=True`, `close` is
+  registered with `atexit`, so it runs on normal interpreter shutdown; call it
+  explicitly for deterministic cleanup.
+</ParamField>
+
+```python
+client.flush()   # drain buffered records
+client.close()   # stop pollers and release resources
+```
+
+## Middlewares
+
+If you would rather not hand-instrument every call, the SDK ships duck-typed
+middlewares that wrap the client you already use and record each model call on
+the active witness session, with the served model identity auto-filled. They
+carry no provider dependencies.
+
+```python
+from sakshi.middleware import watch_openai_compatible
+
+llm = watch_openai_compatible(openai_client)  # also covers Ollama, vLLM, local
+with client.witness(agent_id) as decision:
+    llm.chat.completions.create(model="gpt-5.2", messages=[...])  # recorded
+```
+
+See [Integrations](/integrations/overview) for every middleware
+(`watch_openai_compatible`, `watch_anthropic`, `watch_gemini`, `watch_bedrock`,
+`watch_langgraph`, `witness_node`, `watch_mcp`) and worked examples. To govern
+agents over the Model Context Protocol, see [MCP governance](/sdk/mcp).
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Register, witness, and verify the chain end to end.
+  </Card>
+  <Card title="Autonomy envelopes" icon="shield-halved" href="/concepts/autonomy-envelopes">
+    How `enforce` routes actions to auto, review, or block.
+  </Card>
+  <Card title="Middlewares" icon="plug" href="/integrations/overview">
+    One-line capture for OpenAI, Anthropic, Gemini, Bedrock, and LangGraph.
+  </Card>
+  <Card title="API reference" icon="terminal" href="/api-reference/introduction">
+    The endpoints the SDK calls, generated from the live spec.
+  </Card>
+</CardGroup>

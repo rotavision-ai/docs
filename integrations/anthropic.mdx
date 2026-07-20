@@ -1,0 +1,85 @@
+---
+title: Anthropic
+description: "Witness Anthropic Messages API calls with one line, with no dependency on the Anthropic SDK."
+---
+
+`watch_anthropic` wraps any client that exposes `messages.create`, the Anthropic
+SDK shape. It is duck-typed, so the Sakshi SDK does not depend on the `anthropic`
+package: it wraps the client you already hold.
+
+## Install
+
+```bash
+pip install sakshi-sdk anthropic
+```
+
+## Wrap the client
+
+<CodeGroup>
+
+```python Before
+from anthropic import Anthropic
+
+client = Anthropic()
+
+reply = client.messages.create(
+    model="claude-opus-4-6",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Assess this applicant."}],
+)
+```
+
+```python After
+from anthropic import Anthropic
+from sakshi.middleware import watch_anthropic
+
+client = watch_anthropic(Anthropic())
+
+with sakshi.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    reply = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "Assess this applicant."}],
+    )
+    decision.action(outcome="approved", mode="auto")
+```
+
+</CodeGroup>
+
+See [the shared shape](/integrations/overview#the-shared-shape) for how `sakshi`
+and `agent_id` are created.
+
+## What gets recorded
+
+Each message inside a witness session lands an `llm_call` step, and the served
+model identity auto-fills (para-56):
+
+- The provider, recorded as `anthropic`.
+- `model_requested` versus `model_served`, so a silent model swap is visible.
+- The response id and the stop reason.
+- Input and output token usage.
+- The call latency.
+- With content capture on, the last message you sent and the first text block of
+  the response, each truncated to `content_limit`.
+
+## Capture options
+
+```python
+watch_anthropic(client, capture_content=True, content_limit=1000)
+```
+
+- `capture_content` defaults to `True`. Content capture is safe by design: the
+  platform tokenizes PII at ingest, before storage or hashing. Set it to `False`
+  for a minimal-capture deployment where only metadata, tokens, and identity are
+  recorded.
+- `content_limit` caps how much of each message and response is stored. The
+  default is 1000 characters.
+
+<Note>
+  A call made outside a witness session passes through untouched and is not
+  recorded. Recording is fail-open: it never breaks or delays the message call.
+</Note>
+
+<Card title="Full SDK reference" icon="code" href="/sdk/python">
+  The client, the witness session, and enforcement.
+</Card>

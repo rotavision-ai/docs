@@ -1,143 +1,83 @@
 ---
-title: LangChain Integration
-description: "Add Rotavision trust & monitoring to LangChain apps"
+title: LangChain
+description: "Witness LangChain apps through the provider middleware underneath, and the LangGraph path for graph-structured agents."
 ---
 
-## Overview
+There is no `watch_langchain`, and Sakshi does not invent one. LangChain does not
+run models itself: it builds on the same provider SDKs Sakshi already wraps, and
+modern LangChain agents compile to a graph. So a LangChain app is witnessed
+through the surfaces that already exist, with no LangChain dependency in the SDK.
 
-Integrate Rotavision with LangChain to add fairness monitoring, explainability, and reliability tracking to your LLM applications.
+There are two accurate paths, and you can use both together.
 
-## Installation
+## Path A: wrap the provider client (recommended for model evidence)
 
-```bash
-pip install rotavision langchain
+A LangChain chat model calls a provider SDK client underneath. Build that client
+yourself, wrap it with the matching Sakshi middleware, and hand the wrapped client
+to the chat model. Every completion then lands an `llm_call` step with the served
+model identity (para-56), tokens, and outcome.
+
+<CodeGroup>
+
+```python OpenAI-backed
+from openai import OpenAI
+from langchain_openai import ChatOpenAI
+from sakshi.middleware import watch_openai_compatible
+
+client = watch_openai_compatible(OpenAI())
+llm = ChatOpenAI(model="gpt-5.2", client=client.chat.completions)
+
+with sakshi.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    reply = llm.invoke("Assess this applicant.")
+    decision.action(outcome="approved", mode="auto")
 ```
 
-## Sankalp as LangChain LLM
+```python Anthropic-backed
+from anthropic import Anthropic
+from langchain_anthropic import ChatAnthropic
+from sakshi.middleware import watch_anthropic
 
-Use Sankalp as your LangChain LLM for unified routing and monitoring:
+client = watch_anthropic(Anthropic())
+llm = ChatAnthropic(model="claude-opus-4-6", client=client.messages)
+
+with sakshi.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    reply = llm.invoke("Assess this applicant.")
+    decision.action(outcome="approved", mode="auto")
+```
+
+</CodeGroup>
+
+The middleware wraps the client and exposes the same `chat.completions` or
+`messages` surface LangChain calls, so what gets recorded is exactly what the
+[OpenAI](/integrations/openai) and [Anthropic](/integrations/anthropic) pages
+describe. Consult your LangChain version for the precise constructor argument that
+accepts a preconstructed client.
+
+## Path B: witness the graph (recommended for agents)
+
+A LangChain agent built with LangGraph, or with a helper like `create_react_agent`,
+compiles to a graph that exposes `invoke` and `stream`. Wrap it with
+`watch_langgraph`, and decorate individual nodes with `witness_node`. This path is
+provider-agnostic: it does not need to know which model sits underneath.
 
 ```python
-from langchain.llms import BaseLLM
-from rotavision.integrations.langchain import SankalpLLM
+from sakshi.middleware import watch_langgraph
 
-# Create Sankalp-backed LLM
-llm = SankalpLLM(
-    api_key="rv_live_...",
-    model="gpt-5-mini",
-    routing={
-        "optimize": "cost",
-        "data_residency": "india"
-    }
-)
+agent = watch_langgraph(compiled_agent)
 
-# Use with LangChain
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-
-prompt = PromptTemplate(
-    input_variables=["topic"],
-    template="Write a brief summary about {topic}"
-)
-
-chain = LLMChain(llm=llm, prompt=prompt)
-result = chain.run("AI adoption in India")
+with sakshi.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    result = agent.invoke({"messages": [("user", "Assess this applicant.")]})
+    decision.action(outcome="approved", mode="auto")
 ```
 
-## Callback Handler for Monitoring
+Combine both paths for the fullest evidence: Path B records the graph and node
+control flow, and Path A records the model calls inside each node.
 
-Add Guardian monitoring to any LangChain app:
+<Tip>
+  If your LangChain app is a graph, start with Path B. See
+  [LangGraph](/integrations/langgraph) for `watch_langgraph` and `witness_node`.
+</Tip>
 
-```python
-from langchain.callbacks import BaseCallbackHandler
-from rotavision.integrations.langchain import GuardianCallbackHandler
-
-# Create callback handler
-guardian_callback = GuardianCallbackHandler(
-    api_key="rv_live_...",
-    monitor_id="mon_abc123"
-)
-
-# Use with any LangChain component
-from langchain.chat_models import ChatOpenAI
-
-llm = ChatOpenAI(
-    callbacks=[guardian_callback]
-)
-
-# All LLM calls are automatically logged to Guardian
-response = llm.predict("Hello, world!")
-```
-
-## RAG with Fairness Monitoring
-
-Monitor your RAG pipeline for fairness:
-
-```python
-from langchain.chains import RetrievalQA
-from langchain.vectorstores import Chroma
-from rotavision.integrations.langchain import FairnessMonitor
-
-# Create fairness monitor
-fairness_monitor = FairnessMonitor(
-    api_key="rv_live_...",
-    protected_attributes=["language", "region"]
-)
-
-# Wrap your retriever
-monitored_retriever = fairness_monitor.wrap_retriever(
-    retriever=vectorstore.as_retriever()
-)
-
-# Use in RAG chain
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=monitored_retriever
-)
-
-# Queries are analyzed for fairness across protected groups
-result = qa_chain.run("What are the loan eligibility criteria?")
-```
-
-## Agent Monitoring
-
-Monitor LangChain agents:
-
-```python
-from langchain.agents import initialize_agent, Tool
-from rotavision.integrations.langchain import AgentMonitor
-
-agent_monitor = AgentMonitor(
-    api_key="rv_live_...",
-    log_thoughts=True,
-    log_actions=True
-)
-
-agent = initialize_agent(
-    tools=tools,
-    llm=llm,
-    agent="zero-shot-react-description",
-    callbacks=[agent_monitor]
-)
-
-# Agent reasoning and actions are logged
-result = agent.run("Research the latest EV sales in India")
-```
-
-## LCEL Integration
-
-Works with LangChain Expression Language:
-
-```python
-from langchain.schema.runnable import RunnablePassthrough
-from rotavision.integrations.langchain import rotavision_middleware
-
-# Add Rotavision middleware to any chain
-chain = (
-    {"context": retriever, "question": RunnablePassthrough()}
-    | rotavision_middleware(api_key="rv_live_...", monitor_id="mon_123")
-    | prompt
-    | llm
-    | output_parser
-)
-```
+<Card title="Full SDK reference" icon="code" href="/sdk/python">
+  The client, the witness session, and enforcement.
+</Card>

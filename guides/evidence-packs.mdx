@@ -1,0 +1,145 @@
+---
+title: Generate an evidence pack
+description: "Map your live records to an RBI, DPDP, SEBI, or IRDAI instrument, check the readiness score, and export a signed evidence pack."
+---
+
+An evidence pack is a regulator's instrument encoded as data: each clause is
+mapped to the evidence that satisfies it, and each mapping is scored against the
+live records in your deployment. The result is a readiness score and a signed
+bundle you can hand to an auditor. Adoption moves the score, assertions do not.
+
+This guide picks a clause map, reads its readiness, and exports a signed pack.
+An ingest key is enough to read every endpoint here.
+
+<Steps>
+  <Step title="Pick a clause map">
+    List the instruments this deployment maps. The `name` field is the
+    `map_name` the pack endpoints take.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -H "Authorization: Bearer $SAKSHI_KEY" \
+      https://sakshi.your-company.internal/api/v1/vidhi/clause-maps
+    ```
+
+    ```json Response
+    [
+      { "name": "rbi-mrm-draft-2026", "regulator": "RBI", "clauses": 22 },
+      { "name": "dpdp-act-2023", "regulator": "MeitY", "clauses": 15 },
+      { "name": "sebi-ai-ml-2025", "regulator": "SEBI", "clauses": 11 },
+      { "name": "irdai-ai-anticipated-2026", "regulator": "IRDAI", "clauses": 6 }
+    ]
+    ```
+
+    </CodeGroup>
+
+    | `map_name` | Instrument |
+    |---|---|
+    | `rbi-mrm-draft-2026` | RBI draft Model Risk Management directions |
+    | `dpdp-act-2023` | Digital Personal Data Protection Act and Draft Rules |
+    | `sebi-ai-ml-2025` | SEBI AI/ML use in the securities market (Reg 16C) |
+    | `irdai-ai-anticipated-2026` | IRDAI AI framework (anticipated) |
+  </Step>
+
+  <Step title="Check the readiness score">
+    Readiness scores every clause across every mapped instrument. A clause is
+    `READY` only when each evidence type it cites passes a live check against
+    this deployment's data. Gaps come back with the specific failing evidence and
+    the fix that unblocks them.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -H "Authorization: Bearer $SAKSHI_KEY" \
+      https://sakshi.your-company.internal/api/v1/vidhi/readiness
+    ```
+
+    ```json Response
+    {
+      "method": "clauses scored READY only when every cited evidence type passes a live check ...",
+      "instruments": [
+        {
+          "name": "rbi-mrm-draft-2026",
+          "regulator": "RBI",
+          "score": 0.59,
+          "ready": [ { "clause": "56", "title": "Model identity ..." } ],
+          "gaps": [
+            {
+              "clause": "21",
+              "failing_evidence": [
+                { "type": "agent_inventory", "detail": "1 orphan agent", "fix": "register + assign an owner" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    ```
+
+    </CodeGroup>
+
+    <Tip>
+      Work the gaps in leverage order. One fix, like assigning an owner to an
+      orphan agent, often unblocks several clauses at once.
+    </Tip>
+  </Step>
+
+  <Step title="Generate the pack">
+    Generate the pack for a map. It is built live every time: chain verification
+    runs, telemetry computes, and counts query the current records. It is never
+    a cached document. `window_days` bounds the evidence window (default 30).
+
+    ```bash
+    curl -H "Authorization: Bearer $SAKSHI_KEY" \
+      "https://sakshi.your-company.internal/api/v1/vidhi/packs/rbi-mrm-draft-2026?window_days=90"
+    ```
+  </Step>
+
+  <Step title="Export a signed bundle">
+    The export endpoint returns a freshly generated pack, Ed25519-signed with
+    this deployment's key over the exact bytes. Anyone holding the public key can
+    verify it offline, with no live connection to Sakshi.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -H "Authorization: Bearer $SAKSHI_KEY" \
+      "https://sakshi.your-company.internal/api/v1/vidhi/packs/rbi-mrm-draft-2026/export" \
+      -o rbi-mrm-pack.json
+    ```
+
+    ```json Response (shape)
+    {
+      "pack": { "pack": "rbi-mrm", "instrument": "...", "clauses": [ ... ] },
+      "signature": "base64-ed25519...",
+      "public_key": "base64...",
+      "signed_at": "2026-07-21T09:14:03Z"
+    }
+    ```
+
+    </CodeGroup>
+
+    <Note>
+      The signature covers the exact serialized bytes of the pack. Re-serialize
+      or edit a field and verification fails, which is the point.
+    </Note>
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Evidence packs" icon="gavel" href="/concepts/evidence-packs">
+    How instruments are encoded as clause maps and scored on live evidence.
+  </Card>
+  <Card title="Fairness screening" icon="scale-balanced" href="/guides/fairness-screening">
+    The Vishwas declared-first screens that feed several clauses.
+  </Card>
+  <Card title="Bound autonomy" icon="shield-halved" href="/guides/bound-autonomy">
+    The kill switch and envelope evidence that many clauses depend on.
+  </Card>
+  <Card title="API reference" icon="terminal" href="/api-reference/introduction">
+    The full Vidhi endpoint surface.
+  </Card>
+</CardGroup>

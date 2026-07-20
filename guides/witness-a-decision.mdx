@@ -1,0 +1,117 @@
+---
+title: Witness a decision
+description: "Record a decision on the tamper-evident chain: open a session, capture the reasoning and outcome, then recompute the chain to verify it."
+---
+
+A witnessed decision is the unit of governance. Each record captures the model
+that decided, the steps it took, the tools it called, and the action it
+produced, and each record is hashed onto a chain with the one before it. Anyone
+can recompute the chain and prove nothing was altered after the fact.
+
+This guide witnesses one decision and then verifies it independently. It assumes
+a [registered agent](/guides/register-an-agent) and an initialized client.
+
+<Steps>
+  <Step title="Open a witness session">
+    `witness` returns a session used as a context manager. Pass the model
+    identity, any context, and a client reference you can trace back to your own
+    system. Identifiers in `context` are tokenized at ingest, so raw PII never
+    reaches the chain.
+
+    ```python
+    with client.witness(
+        agent_id,
+        model={"provider": "openai", "name": "gpt-5.2", "version": "2026-05"},
+        context={"applicant_aadhaar": "XXXX-XXXX-1234"},
+        client_ref="APP-2026-04471",
+    ) as decision:
+        ...
+    ```
+
+    <Note>
+      The `applicant_aadhaar` value above is tokenized before storage or
+      hashing. Sakshi governs the decision, it never becomes the system of
+      record for the identifier. See
+      [PII tokenization](/concepts/pii-tokenization).
+    </Note>
+  </Step>
+
+  <Step title="Record the reasoning as it happens">
+    Inside the block, record the steps in order. Each method appends to the same
+    decision. Capture is fail-open: a recording problem is logged and dropped, it
+    never breaks the host agent.
+
+    ```python
+    with client.witness(agent_id, client_ref="APP-2026-04471") as decision:
+        decision.step("retrieve", source="credit-bureau")
+        decision.tool("bureau_lookup", output={"score": 780, "band": "prime"})
+        decision.step("assess", risk_band="low", score=0.92)
+        decision.model_identity(name="gpt-5.2", version="2026-05")
+        decision.human("review", who="reviewer:meera", verdict="concur")
+        decision.action(outcome="approved", amount=1_500_000, mode="auto")
+    ```
+
+    | Method | Records |
+    |---|---|
+    | `decision.step(name, **data)` | A reasoning step |
+    | `decision.tool(name, output, **data)` | A tool call and its result |
+    | `decision.model_identity(**data)` | The model that decided (RBI MRM para 56) |
+    | `decision.human(kind, who, **data)` | A human touchpoint |
+    | `decision.action(**data)` | The final action and outcome |
+
+    An exception raised inside the block is captured as the outcome and
+    re-raised. Failures are evidence too.
+  </Step>
+
+  <Step title="Let the block close">
+    The record is assembled and written to the chain when the `with` block
+    exits, not on each call. In the default fail-open mode the write is buffered
+    on a background worker; pass `fail_open=False` to `SakshiClient` for
+    synchronous, raising capture where losing evidence is worse than stopping.
+
+    <Tip>
+      If you drive your LLM through a [middleware](/integrations/overview), each
+      model call auto-attaches an `llm_call` step and fills in the model
+      identity from the provider response. You get the same chain without
+      hand-instrumenting every call.
+    </Tip>
+  </Step>
+
+  <Step title="Verify the chain">
+    Recompute the chain and confirm no record was tampered with. This needs no
+    trust in Rotavision: anyone with read access can run it.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -H "Authorization: Bearer $SAKSHI_KEY" \
+      https://sakshi.your-company.internal/api/v1/chain/verify
+    ```
+
+    ```json Response
+    { "valid": true, "checked": 2038, "first_invalid_seq": null }
+    ```
+
+    </CodeGroup>
+
+    Alter a single field in any record and `valid` becomes `false`, with
+    `first_invalid_seq` pointing at exactly where the recomputation diverged.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="The decision chain" icon="link" href="/concepts/decision-chain">
+    How records are hashed together and why recomputation is the proof.
+  </Card>
+  <Card title="Bound autonomy" icon="shield-halved" href="/guides/bound-autonomy">
+    Decide whether an action may run before it does, not just record it after.
+  </Card>
+  <Card title="Add it with one line" icon="plug" href="/integrations/overview">
+    Wrap an OpenAI, Anthropic, Gemini, Bedrock, or LangGraph agent.
+  </Card>
+  <Card title="Python SDK" icon="code" href="/sdk/python">
+    The witness session and every method it exposes.
+  </Card>
+</CardGroup>

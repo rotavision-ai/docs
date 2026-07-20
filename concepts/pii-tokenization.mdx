@@ -1,0 +1,59 @@
+---
+title: PII tokenization
+description: "Identifiers are tokenized at ingest, before anything is stored, so raw personal data never enters the chain. Sakshi governs the act and holds the proof; it never becomes the store for raw sensitive data."
+---
+
+Sakshi records every decision, and decisions touch Aadhaar numbers, PANs, card
+numbers, and account numbers. A governance layer that accumulated all of that
+would become the most sensitive database in the building. Sakshi is built so it
+cannot: raw identifiers are tokenized at ingest, before anything is stored.
+
+## Tokenized at ingest
+
+When a record arrives, identifiers are replaced by tokens on the way in, ahead of
+persistence. Two things do the work: a deterministic layer that recognizes
+known identifier formats, and a named-entity recognition (NER) pass that catches
+identifiers in free text. Because tokenization happens at ingest, the raw value
+never reaches the [decision chain](/concepts/decision-chain). What lands on the
+chain is a token, and the chain is still fully verifiable over tokens.
+
+```python
+with client.witness(
+    agent_id,
+    model={"provider": "openai", "name": "gpt-5.2", "version": "2026-05"},
+    context={"applicant_aadhaar": "XXXX-XXXX-1234"},
+    client_ref="APP-2026-04471",
+) as decision:
+    decision.step("assess", risk_band="low", score=0.92)
+    decision.action(outcome="approved", amount=1_500_000, mode="auto")
+# the Aadhaar value is tokenized before this record is stored
+```
+
+## Governing storage without holding the value
+
+The raw value still has to live somewhere: a compliant store like a UIDAI
+Aadhaar Data Vault. Sakshi's job is to prove it went there, not to hold it.
+Given a reference key, Sakshi verifies the value landed in the vault by checking
+the key's metadata, which the vault exposes without granting decode rights. It
+never sees or detokenizes the value.
+
+`POST /api/v1/vishwas/verify-disposition` returns a **vault-verified**
+disposition when the check passes. A value backed only by a signed receipt is
+recorded as **attested**, and a value sitting outside the vault, or offshore, is
+flagged as a residency breach. An assertion would have hidden that; verification
+surfaces it.
+
+<Warning>
+  Sakshi governs the act and holds the proof. It never becomes the system of
+  record for raw sensitive data. That boundary is a core safety property, not a
+  configuration option.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Document and KYC governance" icon="file-shield" href="/guides/register-an-agent">
+    Govern what was extracted, by which agent, and where it was stored.
+  </Card>
+  <Card title="Fairness screening" icon="scale-balanced" href="/guides/fairness-screening">
+    Declared-first screens that run without ever de-anonymizing anyone.
+  </Card>
+</CardGroup>

@@ -1,0 +1,144 @@
+---
+title: Register an agent
+description: "Put an agent under governance: register it, set its owner and autonomy tier, activate it, and optionally verify its identity."
+---
+
+Know Your Agent is the first module for a reason. Before an agent decides
+anything, it needs an entry in the inventory: an owner who is accountable, a
+declared autonomy level, and a verifiable identity. Nothing runs unregistered.
+
+This guide registers an agent, activates it, and attaches a cryptographic
+identity. It assumes you have the SDK installed (`pip install sakshi-sdk`) and a
+Sakshi deployment you can reach. See the [Quickstart](/quickstart) if you have
+neither.
+
+<Steps>
+  <Step title="Initialize the client">
+    An ingest API key is enough to register an agent. Capture is fail-open by
+    default, which is what you want in production: governance must never take
+    the host agent down.
+
+    ```python
+    from sakshi import SakshiClient
+
+    client = SakshiClient(
+        base_url="https://sakshi.your-company.internal",
+        api_key="sks_...",
+    )
+    ```
+  </Step>
+
+  <Step title="Register the agent">
+    `register` is synchronous and idempotent by name, so it is safe to call on
+    every startup: the second call returns the existing agent rather than
+    creating a duplicate. Give it an accountable owner and, where you can, a
+    blast radius describing what the agent can touch.
+
+    ```python
+    agent_id = client.register(
+        "loan-decision-agent",
+        owner_name="Priya Sharma",
+        owner_email="priya@your-company.com",
+        autonomy_tier="L1",
+        org_unit="retail-credit",
+        blast_radius={"moves_money": True, "customer_facing": True},
+        description="Approves or refers retail loan applications.",
+    )
+    ```
+
+    `autonomy_tier` is the declared autonomy level (`L0` through `L4`) and is a
+    registry attribute only. The limits that are actually enforced live in the
+    agent's [autonomy envelope](/guides/bound-autonomy). `blast_radius` is a set
+    of boolean facts the envelope engine can match rules against.
+
+    <Note>
+      `owner_email` matters. An agent with no accountable owner is an orphan,
+      and Sakshi surfaces orphans (`GET /api/v1/agents/orphans`) so they get an
+      owner or get suspended.
+    </Note>
+  </Step>
+
+  <Step title="Activate the agent">
+    A freshly registered agent lands in `draft`. Activation flips its status to
+    `active`, and it is a governance act, so it needs an OIDC JWT, not an ingest
+    key. This separation is deliberate: the credential that lets an agent write
+    evidence must not also be able to promote an agent into production.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -X PATCH \
+      https://sakshi.your-company.internal/api/v1/agents/$AGENT_ID \
+      -H "Authorization: Bearer $SAKSHI_GOVERNANCE_JWT" \
+      -H "Content-Type: application/json" \
+      -d '{"status": "active"}'
+    ```
+
+    ```json Response
+    {
+      "id": "agt_7f3a...",
+      "name": "loan-decision-agent",
+      "status": "active",
+      "autonomy_tier": "L1",
+      "owner_email": "priya@your-company.com"
+    }
+    ```
+
+    </CodeGroup>
+
+    <Warning>
+      Activation, ownership transfer, and envelope publication all require a
+      governance JWT. An ingest key will get a `403`. See
+      [Authentication](/authentication) for how to mint each credential.
+    </Warning>
+  </Step>
+
+  <Step title="Verify an A2A identity (optional)">
+    If the agent presents an [A2A Signed Agent Card](/concepts/know-your-agent),
+    Sakshi verifies the Ed25519 signature over the card's canonical bytes and
+    records the agent as identity-verified. A tampered card fails verification.
+    You can instead record a declared Entra or workload identity, which is
+    marked unverified honestly: a claim is not a proof.
+
+    <CodeGroup>
+
+    ```bash Verify a signed card
+    curl -X POST \
+      https://sakshi.your-company.internal/api/v1/agents/$AGENT_ID/identity \
+      -H "Authorization: Bearer $SAKSHI_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"signed_card": { "name": "loan-decision-agent", "signature": "..." }}'
+    ```
+
+    ```bash Record a declared identity
+    curl -X POST \
+      https://sakshi.your-company.internal/api/v1/agents/$AGENT_ID/identity \
+      -H "Authorization: Bearer $SAKSHI_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"declared_source": "entra", "declared_ref": "agent://acme/loan-decision"}'
+    ```
+
+    </CodeGroup>
+
+    The verdict is attested, and the agent then carries an
+    `identity_verified` flag with its `identity_source` and `identity_ref`.
+    Sakshi verifies an external identity rather than inventing one.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Witness a decision" icon="eye" href="/guides/witness-a-decision">
+    Record what the agent decides on the tamper-evident chain.
+  </Card>
+  <Card title="Bound autonomy" icon="shield-halved" href="/guides/bound-autonomy">
+    Publish an envelope so the agent's actions route to auto, review, or block.
+  </Card>
+  <Card title="Know Your Agent" icon="clipboard-list" href="/concepts/know-your-agent">
+    The registry model: owners, tiers, provenance, and verifiable identity.
+  </Card>
+  <Card title="Python SDK" icon="code" href="/sdk/python">
+    Every client method, in full.
+  </Card>
+</CardGroup>
