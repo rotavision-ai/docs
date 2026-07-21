@@ -20,7 +20,7 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "authentication", "errors"]
+            "pages": ["introduction", "evaluate", "quickstart", "authentication", "errors"]
           },
           {
             "group": "Core Concepts",

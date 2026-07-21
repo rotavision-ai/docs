@@ -1,0 +1,146 @@
+---
+title: Evaluate Sakshi
+description: "A practical path for a BFSI team evaluating Sakshi: get a writable instance, govern your first agent, verify the chain yourself, and export a regulator-mapped evidence pack, in about half an hour."
+---
+
+This is the shortest honest path from "curious" to "convinced" for a team
+evaluating Sakshi on a real use case. It governs one agent end to end, on your
+own instance, and ends with a signed evidence pack you can hand to a risk or
+audit function. Budget about thirty minutes.
+
+The whole point is that you do not have to take our word for anything. Every
+decision is recomputable, the evidence bundle is signed over its exact bytes, and
+Sakshi never sees a raw identifier.
+
+## 1. Get a writable instance
+
+You need an instance you can write to. There are two ways in.
+
+<CardGroup cols={2}>
+  <Card title="Request a sandbox" icon="flask" href="https://rotavision.com/sandbox">
+    A private, synthetic-data Sakshi, provisioned for you, no install. Writable,
+    so you can register agents and witness decisions. The fastest way to start.
+  </Card>
+  <Card title="Self-host it" icon="server" href="https://rotavision.com/deploy">
+    Single-tenant, in your VPC or on-prem. One host, one install. Evidence never
+    leaves your environment. The path your security team will want to see.
+  </Card>
+</CardGroup>
+
+The public demo at `https://demo.rotavision.com` is read-only, so use it to look
+around, not to run this walkthrough.
+
+Then mint an ingest key in the console under **Admin → API keys** and point the
+SDK at your instance. See [Authentication](/authentication).
+
+## 2. Govern your first agent
+
+Wrap one real decision. Register the agent, then witness a decision as it happens.
+Identifiers you pass are tokenized at ingest, so raw PII never lands on the chain.
+
+```python
+from sakshi import SakshiClient
+
+client = SakshiClient("https://sakshi.your-company.internal", api_key="sks_...")
+
+agent_id = client.register(
+    "loan-decision-agent",
+    owner_name="Priya Sharma",
+    owner_email="priya@your-company.com",
+    autonomy_tier="L1",
+)
+
+with client.witness(agent_id, client_ref="APP-2026-04471") as decision:
+    decision.step("retrieve", source="credit-bureau")
+    decision.step("assess", risk_band="low", score=0.92)
+    decision.action(outcome="approved", amount=1_500_000, mode="auto")
+```
+
+Already run agents on a framework? You do not rewrite them. Add one line of
+middleware for [OpenAI](/integrations/openai), [Anthropic](/integrations/anthropic),
+[Gemini](/integrations/gemini), [Bedrock](/integrations/bedrock),
+[LangGraph](/integrations/langgraph), or [Google ADK](/integrations/adk), or govern
+tool calls over [MCP](/integrations/mcp). See [Register an agent](/guides/register-an-agent)
+and [Witness a decision](/guides/witness-a-decision).
+
+## 3. Verify the chain yourself
+
+This is the step that matters. Recompute the chain and confirm it holds, without
+trusting Rotavision or even your own operators.
+
+<CodeGroup>
+
+```bash cURL
+curl -H "Authorization: Bearer sks_..." \
+  https://sakshi.your-company.internal/api/v1/chain/verify
+```
+
+```json Response
+{ "valid": true, "checked": 1842, "first_invalid_seq": null }
+```
+
+</CodeGroup>
+
+Tamper with a single field in any record and `valid` flips to `false`, and the
+response tells you the sequence number where it broke. That is the trust model:
+evidence, not assertion. See [The decision chain](/concepts/decision-chain).
+
+## 4. Bound the autonomy
+
+Publish an autonomy envelope so consequential actions route to auto, human review,
+or block by stakes and confidence, and drill the kill switch. Enforcement fails
+closed: if Sakshi is unreachable, an ungoverned action does not slip through. See
+[Bound autonomy](/guides/bound-autonomy).
+
+```python
+from sakshi import SakshiBlocked, SakshiSyncReviewRequired
+
+try:
+    client.enforce(agent_id, "approve_loan", stakes=1_500_000, confidence=0.92)
+except SakshiSyncReviewRequired:
+    ...  # parked for a human before it can run
+except SakshiBlocked:
+    ...  # the envelope or the kill switch blocked it
+```
+
+## 5. Produce the regulator evidence
+
+This is what a risk or audit function actually wants. Read your readiness across
+instruments, then export a signed evidence pack that maps your live records to the
+obligation, clause by clause.
+
+<CodeGroup>
+
+```bash Readiness
+curl -H "Authorization: Bearer sks_..." \
+  https://sakshi.your-company.internal/api/v1/vidhi/readiness
+```
+
+```bash Signed pack (RBI MRM)
+curl -H "Authorization: Bearer sks_..." \
+  "https://sakshi.your-company.internal/api/v1/vidhi/packs/rbi-mrm-draft-2026/export"
+```
+
+</CodeGroup>
+
+Packs cover RBI Model Risk Management, DPDP, SEBI, and IRDAI. Each is Ed25519-signed
+over its exact bytes, so it stands on its own once exported. See
+[Evidence packs](/guides/evidence-packs). For fairness, the declared-first screen
+flags a cohort only on a threshold breach that is also statistically significant,
+so it does not cry wolf. See [Fairness screening](/guides/fairness-screening).
+
+## What a design-partner engagement looks like
+
+If the evaluation lands, the next step is a design partnership: we deploy alongside
+you, wire Sakshi to the agents you actually run, and shape the roadmap around what
+you hit first. It is deepest in BFSI, where the regulatory work is furthest along.
+
+<Card title="Talk to us about a partnership" icon="handshake" href="https://rotavision.com/get-started">
+  Ways in, from a free sandbox to a production engagement in your VPC.
+</Card>
+
+<Note>
+  Sakshi is single-tenant and runs in your environment. Customer data never leaves
+  it, PII is tokenized before anything is stored or hashed, and every record is
+  independently verifiable, even by an auditor who does not trust us.
+</Note>
