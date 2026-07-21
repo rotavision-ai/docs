@@ -1,0 +1,125 @@
+---
+title: Self-hosting
+description: "Run Sakshi single-tenant in your own environment: one host, one install, evidence that never leaves your VPC, and a chain anyone can recompute. What a bank's security team wants to see."
+---
+
+Sakshi is single-tenant by design. It installs on one host in your VPC or on-prem,
+holds your evidence in your environment, and never phones home. PII is tokenized
+before anything is stored or hashed, and every record is independently verifiable,
+even by an auditor who does not trust Rotavision. This page is the deployment and
+security posture for the team signing off on that.
+
+<Note>
+  One host is one install. Container and volume names are pinned to a single tenant
+  on purpose, so a deployment's identity and its secrets are unambiguous. To
+  evaluate without installing anything, [request a sandbox](https://rotavision.com/sandbox)
+  instead.
+</Note>
+
+## Prerequisites
+
+- A VM: 4 vCPU / 8 GB RAM / 40 GB disk (Ubuntu 22.04+, or any Docker host). Add a
+  little headroom for the optional on-host PII model.
+- Docker Engine with the compose plugin, plus `openssl` and `python3`.
+- For a public deployment: a DNS A record pointing at the VM and ports 80/443
+  reachable, so the built-in reverse proxy (Caddy) can provision TLS automatically.
+
+## Install
+
+Sakshi ships as a single-command installer. It runs preflight checks, generates
+its own secrets, wires the identity provider, writes the compose and TLS config,
+builds, starts, and waits for health.
+
+<CodeGroup>
+
+```bash Your domain (TLS)
+./deploy/install.sh --domain sakshi.your-company.internal
+```
+
+```bash Local evaluation (http)
+./deploy/install.sh --local
+```
+
+</CodeGroup>
+
+The installer generates the deployment's secrets into a `.env` (mode `600`) and
+**refuses to overwrite an existing one** without an explicit `--force`. A live
+deployment's secrets are its identity, so rotating them by accident is made
+impossible.
+
+## Verify in ten minutes
+
+<Steps>
+  <Step title="Open the console and sign in">
+    The Overview page loads with an empty registry on a fresh install.
+  </Step>
+  <Step title="Mint an ingest key">
+    Under **Admin → API keys** (an admin action). The installer also writes a
+    break-glass bootstrap key into `.env`.
+  </Step>
+  <Step title="Register a test agent through the SDK">
+    ```python
+    from sakshi import SakshiClient
+
+    client = SakshiClient("https://sakshi.your-company.internal", api_key="sks_...")
+    client.register("install-smoke-agent", owner_name="You", owner_email="you@your-company.com")
+    ```
+  </Step>
+  <Step title="Recompute the chain">
+    `GET /api/v1/chain/verify` returns `valid: true` once decisions exist. That is
+    the acceptance test: the evidence checks out against itself.
+  </Step>
+</Steps>
+
+After any install or routing change, run the deployment smoke against the real
+domain. It exercises the proxied stack (every routing contract, then a full SSO
+login in a browser) that an in-process test suite cannot see.
+
+## Security posture
+
+<AccordionGroup>
+  <Accordion title="Identity and access" icon="key">
+    Point the platform at your own OIDC identity provider by setting the issuer and
+    client credentials. Roles map to `admin`, `governance-officer`, `reviewer`, and
+    `auditor`; a teams claim scopes review queues. The shipped demo realm is
+    demo-grade and is meant to be replaced before production.
+  </Accordion>
+  <Accordion title="PII handling and residency" icon="shield">
+    Identifiers are tokenized at ingest, before anything is stored or hashed, so raw
+    PII never lands on the chain. An optional on-host NER model (open weights you
+    mount yourself) strengthens detection without any egress. Local-model
+    middlewares (OpenAI-compatible / Ollama) keep sensitive routes fully in-VPC,
+    with the model weights digest witnessed on each call. Nothing leaves the host.
+  </Accordion>
+  <Accordion title="Observability" icon="chart-line">
+    A Prometheus endpoint at `/metrics` exposes evidence-derived gauges (agents by
+    status, decision and chain head, queue depths, active halts, open incidents).
+    It is off unless a dedicated scrape token is set, and requires exactly that
+    token, separate from ingest keys. Every count derives from evidence tables;
+    nothing self-reports.
+  </Accordion>
+  <Accordion title="Rate limiting" icon="gauge">
+    Public installs enable a per-credential token-bucket limiter that answers `429`
+    with `Retry-After`. Callers are keyed by a hashed credential, so one noisy agent
+    cannot starve the rest, and health endpoints are exempt for monitors.
+  </Accordion>
+  <Accordion title="Backups and upgrades" icon="database">
+    The deployment is its secrets, its identity config, and the Postgres data
+    volume. Snapshot the VM or `pg_dump` on a schedule. The hash chain makes
+    tampering evident; backups make the data durable. Upgrades pull the new tree
+    without touching secrets or config, then rebuild and restart; schema migrations
+    run automatically on start.
+  </Accordion>
+</AccordionGroup>
+
+## Interactive API reference on your instance
+
+The deployment serves its own Swagger UI at `/api/docs` (and a reading view at
+`/api/redoc`) plus a public `/status` endpoint (liveness and version only; chain
+state always requires a principal). The reference exposes endpoint shapes, never
+data, and can be switched off entirely for a fully egress-blocked environment.
+
+<Card title="Evaluate Sakshi end to end" icon="rocket" href="/evaluate">
+  The thirty-minute path: govern your first agent, verify the chain, and export a
+  signed evidence pack.
+</Card>
