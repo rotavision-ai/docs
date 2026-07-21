@@ -1,0 +1,95 @@
+---
+title: AWS Strands
+description: "Govern agents built with the AWS Strands Agents SDK: one hook provider witnesses every tool and model call, and can cancel a tool through the autonomy envelope, with no hard dependency on strands."
+---
+
+A Strands `Agent` runs with a list of hook providers, and the SDK invokes their
+callbacks around every tool call and model call. Sakshi ships one.
+`SakshiStrandsHooks` is a `HookProvider`: pass it via `Agent(hooks=[...])` and every
+tool and model call is witnessed on the active decision. Turn on `enforce` and each
+tool call is routed through the agent's autonomy envelope before it runs. The
+provider does not import `strands` at module load, so it degrades cleanly and
+carries no version lock.
+
+## Install
+
+```bash
+pip install sakshi-sdk strands-agents
+```
+
+## Register the hooks
+
+Pass `SakshiStrandsHooks` in the agent's `hooks` list, and run inside a witness
+session.
+
+<CodeGroup>
+
+```python Before
+from strands import Agent
+
+agent = Agent(model=model, tools=[check_credit, approve_loan])
+agent("Assess this applicant.")
+```
+
+```python After
+from strands import Agent
+from sakshi import SakshiClient
+from sakshi.middleware import SakshiStrandsHooks
+
+client = SakshiClient("https://sakshi.your-company.internal", api_key="sks_...")
+
+agent = Agent(
+    model=model,
+    tools=[check_credit, approve_loan],
+    hooks=[SakshiStrandsHooks(client, "loan-decision-agent", enforce=True)],
+)
+
+with client.witness("loan-decision-agent", client_ref="APP-2026-04471") as decision:
+    agent("Assess this applicant.")
+    decision.action(outcome="approved")
+```
+
+</CodeGroup>
+
+## What gets witnessed
+
+As the agent runs, the provider records onto the active witness session:
+
+- **Model calls** become `llm_call` steps with the served model and the finish
+  reason.
+- **Tool calls** become `tool_call` steps with the tool name, the argument keys
+  (never the values, which are tokenized at ingest anyway), and the status. A tool
+  that raises or is cancelled is recorded as such.
+- **The agent invocation** is bracketed with `agent_start` and `agent_end`.
+
+## Enforce in the tool path
+
+With `enforce=True`, the provider routes each tool call through the agent's autonomy
+envelope in `BeforeToolCallEvent`, before the tool runs. An `auto` outcome lets the
+tool proceed; anything else cancels the tool (Strands' `cancel_tool`) so it never
+executes, and a `tool_blocked` step records why.
+
+```python
+hooks = SakshiStrandsHooks(
+    client,
+    "loan-decision-agent",
+    enforce=True,
+    exempt_tools=("check_credit",),          # read-only, never gated
+    stakes_fields=("amount", "stakes"),       # read stakes from tool input
+    confidence_fields=("confidence", "score"),
+)
+```
+
+The stakes and confidence signals are read from the tool's own input by the field
+names you configure. A read-only tool listed in `exempt_tools` is never gated.
+
+<Warning>
+  Enforcement is **fail-closed**: if Sakshi is unreachable, a governed tool is
+  cancelled rather than run ungoverned. Witnessing is **fail-open**: a recording
+  problem never breaks the agent, and with no active witness session the provider
+  is a no-op. `enforce=True` requires the client and the agent id.
+</Warning>
+
+<Card title="Full SDK reference" icon="code" href="/sdk/python">
+  The client, the witness session, and enforcement.
+</Card>

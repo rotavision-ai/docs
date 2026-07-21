@@ -60,6 +60,16 @@ decision).
     Register one plugin on the Runner to witness the whole agent tree, and
     optionally enforce in the tool path.
   </Card>
+  <Card title="CrewAI" icon="users" href="/integrations/crewai">
+    Register one event listener to witness a crew's model and tool calls.
+  </Card>
+  <Card title="AWS Strands" icon="aws" href="/integrations/strands">
+    One hook provider to witness tool and model calls, and cancel a tool through
+    the envelope.
+  </Card>
+  <Card title="AutoGen" icon="microsoft" href="/integrations/autogen">
+    Govern at the tool boundary and the model client. The honest paths that work.
+  </Card>
 </CardGroup>
 
 | Runtime | Function | Wraps |
@@ -70,6 +80,9 @@ decision).
 | AWS Bedrock | `watch_bedrock` | `converse` |
 | LangGraph | `watch_langgraph`, `witness_node` | a compiled graph, a node callable |
 | Google ADK | `SakshiAdkPlugin` | a Runner plugin (witness the tree, enforce the tool path) |
+| CrewAI | `SakshiCrewListener` | an event listener (witness the crew's model + tool calls) |
+| AWS Strands | `SakshiStrandsHooks` | a hook provider (witness + enforce the tool path) |
+| AutoGen | (tool-boundary pattern) | witness + enforce inside your tools |
 | MCP | `watch_mcp` | an MCP client session |
 
 Every function lives in `sakshi.middleware`:
@@ -84,6 +97,8 @@ from sakshi.middleware import (
     witness_node,
     watch_mcp,
     SakshiAdkPlugin,
+    SakshiCrewListener,
+    SakshiStrandsHooks,
 )
 ```
 

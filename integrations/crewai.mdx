@@ -1,0 +1,95 @@
+---
+title: CrewAI
+description: "Witness a CrewAI crew: register one event listener and every model call and tool call in the crew lands on the chain, with no hard dependency on crewai."
+---
+
+CrewAI emits events across a crew's lifecycle (kickoff, agent, task, LLM call, tool
+usage) on a global event bus. Sakshi ships a listener for it. Instantiate
+`SakshiCrewListener` once before `crew.kickoff()` and every model call and tool
+call inside a witness session is recorded on the chain. The listener does not
+import `crewai` at module load, so it degrades cleanly and carries no version lock.
+
+## Install
+
+```bash
+pip install sakshi-sdk crewai
+```
+
+## Register the listener
+
+Create the listener once (it registers on CrewAI's event bus), then run your crew
+inside a witness session.
+
+<CodeGroup>
+
+```python Before
+from crewai import Crew
+
+crew = Crew(agents=[...], tasks=[...])
+result = crew.kickoff(inputs={"application_id": "APP-2026-04471"})
+```
+
+```python After
+from crewai import Crew
+from sakshi import SakshiClient
+from sakshi.middleware import SakshiCrewListener
+
+client = SakshiClient("https://sakshi.your-company.internal", api_key="sks_...")
+SakshiCrewListener()  # registers on the CrewAI event bus (once)
+
+crew = Crew(agents=[...], tasks=[...])
+
+with client.witness("loan-crew", client_ref="APP-2026-04471") as decision:
+    result = crew.kickoff(inputs={"application_id": "APP-2026-04471"})
+    decision.action(outcome="approved")
+```
+
+</CodeGroup>
+
+## What gets witnessed
+
+As the crew runs, the listener records onto the active witness session:
+
+- **Model calls** become `llm_call` steps with the served model, token usage, and
+  finish reason.
+- **Tool calls** become `tool_call` steps with the tool name, the argument keys
+  (never the values, which are tokenized at ingest anyway), the latency, and the
+  role of the agent that called it. A tool that errors is recorded as such.
+- **Crew, agent, and task** boundaries are bracketed, so a multi-agent crew reads
+  as structured control flow on the chain.
+
+Because inputs are tokenized at ingest, a PAN or Aadhaar that flows through a task
+is tokenized before it is stored, exactly as with every other integration.
+
+## Enforcement in CrewAI
+
+CrewAI's event bus is observe-only, so this middleware witnesses; it does not block
+a tool the way the [ADK](/integrations/adk) or [MCP](/integrations/mcp) tool-path
+enforcement does. To gate a consequential action inside CrewAI, call `enforce` at
+the top of the tool's own function and act on the outcome.
+
+```python
+from crewai.tools import tool
+from sakshi import SakshiBlocked, SakshiSyncReviewRequired
+
+@tool("approve_loan")
+def approve_loan(application_id: str, amount: int) -> str:
+    try:
+        client.enforce("loan-crew", "approve_loan", stakes=amount)
+    except (SakshiBlocked, SakshiSyncReviewRequired):
+        return "Parked for review: this action needs a human."
+    ...  # only runs when the envelope returns auto
+```
+
+<Note>
+  Recording is fail-open: a problem writing a step never breaks the crew, and with
+  no active witness session the listener is a no-op. CrewAI dispatches event
+  handlers asynchronously and flushes them before finishing kickoff, so every model
+  and tool call is recorded; the final crew close-bracket is best-effort. Call
+  `crewai_event_bus.flush()` after `kickoff` if you want it guaranteed before the
+  witness session closes.
+</Note>
+
+<Card title="Full SDK reference" icon="code" href="/sdk/python">
+  The client, the witness session, and enforcement.
+</Card>

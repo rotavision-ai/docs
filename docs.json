@@ -70,6 +70,9 @@
               "integrations/langchain",
               "integrations/langgraph",
               "integrations/adk",
+              "integrations/crewai",
+              "integrations/strands",
+              "integrations/autogen",
               "integrations/mcp"
             ]
           }

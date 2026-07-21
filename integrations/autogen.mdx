@@ -1,0 +1,74 @@
+---
+title: AutoGen
+description: "Govern AutoGen agents at the tool boundary and the model client. There is no dedicated one-line middleware, because AutoGen does not expose a single tool-and-model hook, so Sakshi is honest about the two paths that do work."
+---
+
+AutoGen comes in two lineages, Microsoft's `autogen-agentchat` (the 0.4 rewrite) and
+the `ag2` / `pyautogen` fork. Both build their model client internally from a config,
+and neither exposes a single hook that sees both tool calls and model calls the way
+[ADK](/integrations/adk), [CrewAI](/integrations/crewai), and [Strands](/integrations/strands)
+do. So Sakshi does not ship a `watch_autogen`, and does not pretend to. It governs
+AutoGen at the two boundaries that are stable across both lineages: the tool and the
+model client.
+
+## Govern at the tool boundary
+
+This is the path that works across every AutoGen version, and it is where the
+consequential decisions are. Open a witness session around the run, and inside each
+tool that matters, witness the step and call `enforce` before acting.
+
+```python
+from sakshi import SakshiClient, SakshiBlocked, SakshiSyncReviewRequired
+
+client = SakshiClient("https://sakshi.your-company.internal", api_key="sks_...")
+
+def approve_loan(application_id: str, amount: int) -> str:
+    """A tool your AutoGen agent can call."""
+    from sakshi import current_session
+    session = current_session()
+    if session is not None:
+        session.step("tool_call", via="autogen", tool="approve_loan",
+                     arg_keys=["application_id", "amount"])
+    try:
+        client.enforce("loan-agent", "approve_loan", stakes=amount)
+    except (SakshiBlocked, SakshiSyncReviewRequired):
+        return "Parked for review: this action needs a human."
+    ...  # only runs when the envelope returns auto
+
+with client.witness("loan-agent", client_ref="APP-2026-04471") as decision:
+    # run your AutoGen agent / team here; the tool records and enforces as it fires
+    decision.action(outcome="approved")
+```
+
+Register `approve_loan` as a tool with your AutoGen agent as you normally would. The
+witness session is active for the duration of the run, so the tool's `step` lands on
+the same decision, and `enforce` fails closed.
+
+## Witness the model calls
+
+If you construct the underlying provider client yourself, wrap it with the matching
+Sakshi middleware before AutoGen uses it, and every model call inside the witness
+session is recorded, exactly as for a direct
+[OpenAI](/integrations/openai) or [Anthropic](/integrations/anthropic) call.
+
+```python
+from openai import OpenAI
+from sakshi.middleware import watch_openai_compatible
+
+llm = watch_openai_compatible(OpenAI())
+# pass `llm` wherever your AutoGen setup accepts an explicit client
+```
+
+When AutoGen builds the client internally from a config dict, there is no object to
+wrap; use the tool-boundary path above, which is where governance matters most.
+
+<Note>
+  This is the same honesty as the [LangChain](/integrations/langchain) page: Sakshi
+  will not ship a middleware that implies a clean hook the framework does not offer.
+  If AutoGen adds a stable tool-and-model interception point, a dedicated integration
+  follows.
+</Note>
+
+<Card title="Full SDK reference" icon="code" href="/sdk/python">
+  The client, the witness session, and enforcement.
+</Card>
