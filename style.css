@@ -1,0 +1,27 @@
+/* Rotavision docs — match rotavision.com's sharp, minimal aesthetic (no rounded borders).
+   Squares Tailwind rounded-* utilities (Mintlify mint theme) but keeps circles (rounded-full)
+   so avatars, dots, and status indicators stay round. */
+
+[class*="rounded-"]:not([class*="rounded-full"]) {
+  border-radius: 0 !important;
+}
+
+/* Semantic elements Mintlify styles directly (code blocks, callouts, cards, media, inputs) */
+pre,
+code,
+kbd,
+img,
+figure,
+table,
+thead,
+tbody,
+input,
+select,
+textarea,
+button,
+.prose pre,
+.prose code,
+.prose img,
+.prose table {
+  border-radius: 0 !important;
+}
