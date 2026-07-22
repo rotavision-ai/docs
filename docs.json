@@ -35,6 +35,14 @@
             ]
           },
           {
+            "group": "Predict & Prevent",
+            "pages": [
+              "concepts/certification",
+              "concepts/silent-change",
+              "concepts/guardian"
+            ]
+          },
+          {
             "group": "Guides",
             "pages": [
               "guides/register-an-agent",

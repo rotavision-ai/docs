@@ -1,0 +1,64 @@
+---
+title: Certification
+description: "A signed, RBI-mapped fit-for-production certificate for an agent, produced by running a battery over the evidence Sakshi already holds — red-team, fairness, evaluation gates, formally-verified autonomy policy, verified identity. Optionally required before an agent can be activated."
+---
+
+No agent should reach production without a governance sign-off. Certification is
+that sign-off, made verifiable: a battery of checks over the evidence Sakshi
+already holds for a candidate agent, aggregated into a scored verdict and an
+Ed25519-signed certificate with an expiry — each check mapped to the regulatory
+obligation it satisfies.
+
+Certification is **evidence-first**: it reads evidence already on the chain, it
+never drives the agent.
+
+## The battery
+
+A certification run assembles the checks other parts of Sakshi produce:
+
+- **Autonomy envelope** — the agent's policy is formally verified (no dead rules,
+  no escalation that routes higher stakes to *less* oversight). RBI MRM bounded
+  autonomy.
+- **Verified identity** — a cryptographically verified agent identity (KYA / SEBI
+  Reg 16C).
+- **Independent validation** — evaluation gates cleared on the confidence-interval
+  lower bound, not a point estimate. RBI MRM independent validation.
+- **Red-team** — an adversarial evaluation within the attack-success ceiling. RBI
+  MRM red-teaming.
+- **Fairness** — a declared-first bias screen with no flagged cohort. DPDP /
+  fair-lending.
+
+## The verdict
+
+A hard check that fails **denies** the certificate; a missing hard check leaves
+the agent **incomplete** (you cannot certify what was never tested); all hard
+checks passing is **certified**. The certificate carries the per-check results,
+the clause mapping, an expiry, and a signature over the exact bytes — anyone can
+verify it without trusting Sakshi.
+
+```bash
+# run the battery over a candidate agent
+curl -X POST https://YOUR_HOST/api/v1/certify/runs \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"agent_id": "AGENT_ID"}'
+
+# the latest certificate for an agent, and its signed export
+GET /api/v1/certify/agents/{agent_id}/latest
+GET /api/v1/certify/runs/{id}/export
+```
+
+## The gate
+
+Set `SAKSHI_REQUIRE_CERT` and an agent cannot be activated without a valid,
+unexpired certificate — certification becomes required infrastructure in your
+deployment pipeline. A denied or expired agent is refused activation, with the
+reason on record.
+
+## Re-certification
+
+A certificate has a shelf life. Certifying an agent schedules its
+re-certification at the certificate's expiry, and events that invalidate its
+assumptions — a model change, or a [silent behavioural change](/concepts/silent-change) —
+flag it for re-certification immediately. This is the loop that closes the
+[governed-agent lifecycle](/concepts/guardian): certify before ship, watch in
+production, and a silent change sends the agent back through certification.

@@ -1,0 +1,56 @@
+---
+title: Silent-change detection
+description: "Sakshi fingerprints each agent's behaviour from the witnessed decision stream and tells you the day it started behaving differently — and whether the change was declared or silent. Maps to the RBI unauthorised-change obligation."
+---
+
+Agents change silently. A model gets swapped underneath one, a prompt is
+injected, data drifts — and nobody notices until it is a headline. Silent-change
+detection fingerprints each agent's behaviour from the decision chain and tells
+you the day it started behaving differently, with **no new system of record** and
+**no GPU** — just statistics over evidence you already have.
+
+## The behavioural fingerprint
+
+Sakshi computes a fingerprint per agent from its witnessed decisions — the model
+serving it, its decision and routing mix, its tool use, its decline reasons — and
+measures how far a recent window has diverged from the window before it. A
+dimension is only flagged when the shift is both large **and** statistically
+significant, so a quiet agent never cries wolf (the same discipline as the
+Vishwas fairness screen and the evaluation confidence intervals).
+
+```bash
+# fleet summary — changed agents first
+GET /api/v1/behavior/fleet
+
+# per-agent: which dimensions diverged, baseline vs current
+GET /api/v1/behavior/agents/{agent_id}/change
+```
+
+## Declared vs silent
+
+A flagged change is only alarming if it was **undeclared**. Sakshi correlates each
+flagged dimension with the governance events that would explain it — a model
+registered in the agent's provenance, an autonomy envelope published — and
+classifies the change:
+
+- **declared** — every flagged dimension is explained by a governance act you took
+  (a registered model, a published policy). Expected; no alarm.
+- **silent** — a flagged dimension has no governance event to explain it. The agent
+  changed and nobody declared why.
+
+A declared model upgrade and a silent swap look identical in the metrics; the
+difference is whether you told the registry — and Sakshi checks.
+
+## The signed change report
+
+Persisting a report Ed25519-signs the verdict as a tamper-evident,
+RBI-mapped artifact (the unauthorised-change obligation). When the verdict is
+**silent**, the report also emits an `agent_behavior_changed` webhook and flags
+the agent for [re-certification](/concepts/certification) — so a silent change
+automatically sends the agent back through the fit-for-production gate.
+
+```bash
+# persist a signed change report (silent -> flags re-cert + emits a webhook)
+POST /api/v1/behavior/agents/{agent_id}/report
+GET  /api/v1/behavior/reports/{id}/export   # the signed artifact
+```

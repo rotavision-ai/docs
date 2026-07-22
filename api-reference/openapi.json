@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Sakshi Agent Governance API",
+    "title": "Sakshi \u2014 Agent Governance API",
     "description": "Registry (KYA), decision flight recorder, bounded autonomy, evidence packs, fairness screens. Auth: bearer ingest keys create evidence; OIDC JWTs with governance roles mutate state.",
     "version": "0.1.0"
   },
@@ -4444,6 +4444,659 @@
           }
         }
       }
+    },
+    "/api/v1/certify/runs": {
+      "post": {
+        "tags": [
+          "certify"
+        ],
+        "summary": "Create Certification",
+        "description": "Run the certification battery over a candidate agent and issue a signed\ncertificate. A governance act (officer and above): certifying an agent as\nfit for production is a sign-off, not a read.",
+        "operationId": "create_certification_api_v1_certify_runs_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CertifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "certify"
+        ],
+        "summary": "List Certifications",
+        "operationId": "list_certifications_api_v1_certify_runs_get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CertificationOut"
+                  },
+                  "title": "Response List Certifications Api V1 Certify Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/certify/agents/{agent_id}/latest": {
+      "get": {
+        "tags": [
+          "certify"
+        ],
+        "summary": "Latest For Agent",
+        "description": "The most recent certification for an agent \u2014 the one the C2 gate and the\nconsole badge read.",
+        "operationId": "latest_for_agent_api_v1_certify_agents__agent_id__latest_get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/certify/runs/{cert_id}": {
+      "get": {
+        "tags": [
+          "certify"
+        ],
+        "summary": "Get Certification",
+        "operationId": "get_certification_api_v1_certify_runs__cert_id__get",
+        "parameters": [
+          {
+            "name": "cert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cert Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/certify/runs/{cert_id}/export": {
+      "get": {
+        "tags": [
+          "certify"
+        ],
+        "summary": "Export Certification",
+        "description": "The downloadable, independently verifiable certificate: the Ed25519-signed\nbundle whose signature covers the exact payload bytes.",
+        "operationId": "export_certification_api_v1_certify_runs__cert_id__export_get",
+        "parameters": [
+          {
+            "name": "cert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cert Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Export Certification Api V1 Certify Runs  Cert Id  Export Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/behavior/fleet": {
+      "get": {
+        "tags": [
+          "behavior"
+        ],
+        "summary": "Fleet Change",
+        "description": "Behavioural-change summary across the fleet \u2014 changed agents first.",
+        "operationId": "fleet_change_api_v1_behavior_fleet_get",
+        "parameters": [
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 10,
+              "default": 100,
+              "title": "Window"
+            }
+          },
+          {
+            "name": "min_samples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 5,
+              "default": 30,
+              "title": "Min Samples"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Fleet Change Api V1 Behavior Fleet Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/behavior/agents/{agent_id}/change": {
+      "get": {
+        "tags": [
+          "behavior"
+        ],
+        "summary": "Agent Change",
+        "description": "Per-dimension behavioural drift for one agent: the last `window` decisions\nvs the `window` before them.",
+        "operationId": "agent_change_api_v1_behavior_agents__agent_id__change_get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 10,
+              "default": 100,
+              "title": "Window"
+            }
+          },
+          {
+            "name": "min_samples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 5,
+              "default": 30,
+              "title": "Min Samples"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Agent Change Api V1 Behavior Agents  Agent Id  Change Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/behavior/agents/{agent_id}/report": {
+      "post": {
+        "tags": [
+          "behavior"
+        ],
+        "summary": "Create Report",
+        "description": "Persist a signed behavioural-change report. A SILENT change (a flagged\ndimension no governance event explains) is the unauthorised-change finding:\nit flags the agent for re-certification and emits an agent_behavior_changed\nwebhook. A governance act \u2014 producing the signed artifact is a sign-off.",
+        "operationId": "create_report_api_v1_behavior_agents__agent_id__report_post",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 10,
+              "default": 100,
+              "title": "Window"
+            }
+          },
+          {
+            "name": "min_samples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 5,
+              "default": 30,
+              "title": "Min Samples"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/behavior/reports": {
+      "get": {
+        "tags": [
+          "behavior"
+        ],
+        "summary": "List Reports",
+        "operationId": "list_reports_api_v1_behavior_reports_get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChangeReportOut"
+                  },
+                  "title": "Response List Reports Api V1 Behavior Reports Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/behavior/reports/{report_id}": {
+      "get": {
+        "tags": [
+          "behavior"
+        ],
+        "summary": "Get Report",
+        "operationId": "get_report_api_v1_behavior_reports__report_id__get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeReportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/behavior/reports/{report_id}/export": {
+      "get": {
+        "tags": [
+          "behavior"
+        ],
+        "summary": "Export Report",
+        "description": "The Ed25519-signed change report \u2014 the tamper-evident unauthorised-change\nartifact (signature covers the exact payload bytes).",
+        "operationId": "export_report_api_v1_behavior_reports__report_id__export_get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Export Report Api V1 Behavior Reports  Report Id  Export Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/guardian": {
+      "get": {
+        "tags": [
+          "guardian"
+        ],
+        "summary": "Overview",
+        "description": "What the Guardian is watching across the fleet, and the interventions it\nhas fired (each on the chain, via the kill path).",
+        "operationId": "overview_api_v1_guardian_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Overview Api V1 Guardian Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/guardian/agents/{agent_id}/check": {
+      "post": {
+        "tags": [
+          "guardian"
+        ],
+        "summary": "Run Watches",
+        "description": "Evaluate the agent's armed watches now. Any hard watch that trips fires the\nkill path (actor breaker:<name>) \u2014 real-time intervention on demand, for a\ndrill or an operator. (Watches also run on the 60s in-process sweep.)",
+        "operationId": "run_watches_api_v1_guardian_agents__agent_id__check_post",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Run Watches Api V1 Guardian Agents  Agent Id  Check Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4921,7 +5574,9 @@
               "eval_volume",
               "model_change",
               "error_rate",
-              "signal_drift"
+              "signal_drift",
+              "mcp_poisoning",
+              "behavioral_change"
             ],
             "title": "Metric"
           },
@@ -5037,6 +5692,96 @@
         ],
         "title": "BreakerOut"
       },
+      "CertificationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckOut"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "ran_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ran By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "agent_name",
+          "status",
+          "score",
+          "checks",
+          "expires_at",
+          "created_at",
+          "ran_by"
+        ],
+        "title": "CertificationOut"
+      },
+      "CertifyRequest": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "validity_days": {
+            "type": "integer",
+            "title": "Validity Days",
+            "default": 90
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id"
+        ],
+        "title": "CertifyRequest"
+      },
       "ChainHead": {
         "properties": {
           "seq": {
@@ -5094,6 +5839,183 @@
           "checked"
         ],
         "title": "ChainVerification"
+      },
+      "ChangeReportDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification"
+          },
+          "top_psi": {
+            "type": "number",
+            "title": "Top Psi"
+          },
+          "flagged_dimensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flagged Dimensions"
+          },
+          "recert_triggered": {
+            "type": "boolean",
+            "title": "Recert Triggered"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "ran_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ran By"
+          },
+          "analysis": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Analysis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "agent_name",
+          "status",
+          "classification",
+          "top_psi",
+          "flagged_dimensions",
+          "recert_triggered",
+          "created_at",
+          "ran_by",
+          "analysis"
+        ],
+        "title": "ChangeReportDetail"
+      },
+      "ChangeReportOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification"
+          },
+          "top_psi": {
+            "type": "number",
+            "title": "Top Psi"
+          },
+          "flagged_dimensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flagged Dimensions"
+          },
+          "recert_triggered": {
+            "type": "boolean",
+            "title": "Recert Triggered"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "ran_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ran By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "agent_name",
+          "status",
+          "classification",
+          "top_psi",
+          "flagged_dimensions",
+          "recert_triggered",
+          "created_at",
+          "ran_by"
+        ],
+        "title": "ChangeReportOut"
+      },
+      "CheckOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "clause": {
+            "type": "string",
+            "title": "Clause"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "hard": {
+            "type": "boolean",
+            "title": "Hard"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "clause",
+          "detail",
+          "hard"
+        ],
+        "title": "CheckOut"
       },
       "ConfigOut": {
         "properties": {

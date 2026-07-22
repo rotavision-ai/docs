@@ -1,0 +1,54 @@
+---
+title: The Guardian
+description: "Real-time fleet monitoring and intervention. The Guardian watches every agent through evidence-only watches and, when a hard watch trips, halts, escalates or steers it using the same drilled kill switch a human would — every intervention on the tamper-evident record."
+---
+
+A flight recorder tells you why the plane crashed; the Guardian keeps it from
+crashing. It is a live monitor over the whole agent fleet that halts, escalates,
+or steers the moment an agent drifts, is poisoned, or goes off-policy. When a hard
+watch trips it fires the **existing kill path** — so the intervention reuses the
+audited, attested response machinery, not a new one, and every intervention lands
+on the chain with the evidence that justified it.
+
+RBI's draft model-risk directions name continuous monitoring and a kill switch as
+obligations; the Guardian produces both as evidence.
+
+## Watches
+
+The Guardian evaluates each agent through a set of **watches**. The evidence-only
+watches derive entirely from witnessed evidence and need no GPU:
+
+- **Model-identity change** — an undeclared model transition (a silent model swap).
+- **[Silent behavioural change](/concepts/silent-change)** — the agent's behaviour
+  diverged from baseline with no governance event to explain it.
+- **MCP tool poisoning** — a tool's manifest changed mid-session (the OWASP MCP
+  class); a poisoned tool spreads across the fleet.
+- **Error / refusal spike**, **signal drift**, and volume anomalies — the agent no
+  longer looks like what its envelope was written for.
+
+A tripped hard watch halts or routes-to-review the agent through the same drilled
+kill switch, with an actor of `guardian:<watch>`, attested.
+
+```bash
+# what the Guardian is watching, and the interventions it has fired
+GET /api/v1/guardian
+
+# evaluate an agent's watches now (a drill, or on demand)
+POST /api/v1/guardian/agents/{agent_id}/check
+```
+
+## Model-serving watches
+
+Two further watches — **groundedness** (is the output supported by its sources?)
+and **live toxicity** — require serving a judge model on the live stream. Because
+they evaluate live production decisions, the judge must run inside the customer's
+environment (in-VPC or async-batch), never off-region. These watches are declared
+in the control surface but gated behind that serving decision; everything else the
+Guardian does today is evidence-first and needs no GPU.
+
+## The lifecycle
+
+The Guardian is the middle of the governed-agent lifecycle:
+[certify](/concepts/certification) an agent before it ships, the Guardian watches
+it in production, and a [silent change](/concepts/silent-change) sends it back
+through certification. Certify. Watch. Re-certify.
